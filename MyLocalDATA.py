@@ -200,4 +200,3 @@ elif authentication_status is False:
 
 else:  # authentication_status is None
     st.sidebar.warning("🔑 Por favor ingresa tus credenciales")
-```
