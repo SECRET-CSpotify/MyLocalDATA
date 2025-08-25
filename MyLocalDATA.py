@@ -28,7 +28,17 @@ authenticator = stauth.Authenticate(
 )
 
 # login devuelve una tupla: name, authentication_status, username
-name, authentication_status, username = authenticator.login(location="sidebar")
+login_info = authenticator.login(location="sidebar")
+
+st.write("DEBUG login_info:", login_info)
+
+if login_info:
+    authentication_status = login_info.get("authentication_status")
+    name = login_info.get("name")
+    username = login_info.get("username")
+else:
+    authentication_status = None
+    
 
 # Control de flujo de acceso
 if authentication_status:
