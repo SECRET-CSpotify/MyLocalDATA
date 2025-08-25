@@ -31,7 +31,9 @@ authenticator = stauth.Authenticate(
 # Inicializamos siempre para evitar NameError
 name, username, authentication_status = None, None, None
 
-login_info = authenticator.login("Iniciar Sesión", location="sidebar")
+st.sidebar.subheader("🔐 Iniciar Sesión")
+login_info = authenticator.login(location="sidebar")
+
 st.write("DEBUG login_info:", login_info)
 
 
