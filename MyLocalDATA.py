@@ -30,7 +30,7 @@ authenticator = stauth.Authenticate(
 )
 
 # Mostrar login en la sidebar
-authenticator.login(location="sidebar")
+name, authentication_status, username = authenticator.login("Iniciar Sesión", "main")
 
 # Obtener el estado desde session_state
 authentication_status = st.session_state.get("authentication_status")
