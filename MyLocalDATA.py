@@ -15,12 +15,13 @@ st.set_page_config(page_title="Gestor de Clientes", layout="wide")
 # --------------------------
 # Autenticación
 # --------------------------
-# Inicializar variables
-name = None
-username = None
-authentication_status = None
 
-# Cargar configuración
+# 1) Inicializar variables
+name = None
+authentication_status = None
+username = None
+
+# 2) Cargar configuración de autenticación
 with open("auth_config.yaml", "r") as file:
     try:
         config = yaml.load(file, Loader=SafeLoader)
@@ -28,24 +29,42 @@ with open("auth_config.yaml", "r") as file:
         st.error(f"No se pudo cargar auth_config.yaml: {e}")
         st.stop()
 
-# Crear autenticador
+# 3) Crear el autenticador
+#    Asegúrate de que en tu YAML uses:
+#
+#    credentials:
+#      usernames:
+#        juanperez:
+#          name: "Juan Pérez"
+#          password: "1234"
+#    cookie:
+#      name: "app_cookie"
+#      key: "alguna_clave_super_secreta"
+#      expiry_days: 30
+#
+#    Si tu contraseña está en texto plano, añade raw_passwords=True:
 authenticator = stauth.Authenticate(
     config["credentials"],
     config["cookie"]["name"],
     config["cookie"]["key"],
     config["cookie"]["expiry_days"],
+    # raw_passwords=True   # Descomenta si tus passwords no están hasheadas
 )
 
-# Mostrar formulario de login en la barra lateral
-login_info = authenticator.login(location="sidebar")
+# 4) Mostrar el formulario de login en la sidebar
+#    (devuelve una tupla: nombre, estado, username)
+name, authentication_status, username = authenticator.login("Iniciar sesión", "sidebar")
 
-# Extraer credenciales si login_info existe
-if login_info:
-    authentication_status = login_info.get("authentication_status")
-    name                  = login_info.get("name")
-    username              = login_info.get("username")
+# 5) DEBUG: ver en la ui qué devuelve el login
+st.sidebar.write("DEBUG →", {
+    "name": name,
+    "authentication_status": authentication_status,
+    "username": username
+})
 
+# --------------------------
 # Control de acceso
+# --------------------------
 if authentication_status:
 
     st.sidebar.success(f"Bienvenido, {name} 👋")
@@ -104,13 +123,13 @@ if authentication_status:
         with st.form("form_cliente"):
             col1, col2, col3 = st.columns(3)
             with col1:
-                nombre        = st.text_input("Nombre Cliente")
-                nit           = st.text_input("NIT")
-                contacto      = st.text_input("Persona de Contacto")
+                nombre   = st.text_input("Nombre Cliente")
+                nit      = st.text_input("NIT")
+                contacto = st.text_input("Persona de Contacto")
             with col2:
-                telefono      = st.text_input("Teléfono")
-                email         = st.text_input("Email")
-                ciudad        = st.text_input("Ciudad")
+                telefono = st.text_input("Teléfono")
+                email    = st.text_input("Email")
+                ciudad   = st.text_input("Ciudad")
             with col3:
                 fecha_contacto = st.date_input("Fecha de Contacto", datetime.today())
                 observacion    = st.text_area("Observación")
@@ -133,7 +152,7 @@ if authentication_status:
                 st.success("✅ Cliente registrado correctamente")
 
     # --------------------------
-    # Listado de clientes
+    # Listados y exportación
     # --------------------------
     tab1, tab2 = st.tabs(["📋 No Contactados", "✅ Contactados"])
 
@@ -163,7 +182,7 @@ if authentication_status:
             )
 
     # --------------------------
-    # Vista detallada y edición
+    # Vista detallada
     # --------------------------
     st.markdown("---")
     st.subheader("🔎 Vista Detallada por Cliente")
@@ -198,5 +217,5 @@ if authentication_status:
 elif authentication_status is False:
     st.sidebar.error("❌ Usuario o contraseña incorrectos")
 
-else:  # authentication_status is None
+else:
     st.sidebar.warning("🔑 Por favor ingresa tus credenciales")
