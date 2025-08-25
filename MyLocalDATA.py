@@ -28,9 +28,17 @@ authenticator = stauth.Authenticate(
 )
 
 # login devuelve un diccionario o None
-login_info = authenticator.login(location="sidebar")
+# Renderizar formulario de login en sidebar
+authenticator.login("Iniciar Sesión", "sidebar")
 
-st.write("DEBUG login_info:", login_info)
+# Comprobar el estado de autenticación
+authentication_status = st.session_state.get("authentication_status")
+name = st.session_state.get("name")
+username = st.session_state.get("username")
+
+st.write("DEBUG authentication_status:", authentication_status)
+st.write("DEBUG name:", name)
+st.write("DEBUG username:", username)
 
 if login_info is not None:
     authentication_status = login_info.get("authentication_status")
