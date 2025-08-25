@@ -17,9 +17,11 @@ st.set_page_config(page_title="Gestor de Clientes", layout="wide")
 
 # --------------------------
 # Autenticación
+# Cargar configuración
 with open("auth_config.yaml") as file:
     config = yaml.load(file, Loader=SafeLoader)
 
+# Inicializar autenticador
 authenticator = stauth.Authenticate(
     config['credentials'],
     config['cookie']['name'],
@@ -27,29 +29,20 @@ authenticator = stauth.Authenticate(
     config['cookie']['expiry_days'],
 )
 
-# login devuelve un diccionario o None
-# Renderizar formulario de login en sidebar
+# Mostrar login en la sidebar
 authenticator.login(location="sidebar")
 
-# Comprobar el estado de autenticación
+# Obtener el estado desde session_state
 authentication_status = st.session_state.get("authentication_status")
 name = st.session_state.get("name")
 username = st.session_state.get("username")
 
+# DEBUG
 st.write("DEBUG authentication_status:", authentication_status)
 st.write("DEBUG name:", name)
 st.write("DEBUG username:", username)
 
-if login_info is not None:
-    authentication_status = login_info.get("authentication_status")
-    name = login_info.get("name")
-    username = login_info.get("username")
-else:
-    authentication_status = None
-    name = None
-    username = None
-
-# Control de flujo de acceso
+# Control de acceso
 if authentication_status:
     st.sidebar.success(f"Bienvenido, {name} 👋")
     authenticator.logout("Cerrar sesión", "sidebar")
