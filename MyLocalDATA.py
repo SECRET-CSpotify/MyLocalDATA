@@ -27,12 +27,19 @@ authenticator = stauth.Authenticate(
     config['cookie']['expiry_days'],
 )
 
-# login devuelve una tupla: name, authentication_status, username
-name, authentication_status, username = authenticator.login(location="sidebar")
+# login devuelve un diccionario o None
+login_info = authenticator.login(location="sidebar")
 
-st.write("DEBUG name:", name)
-st.write("DEBUG authentication_status:", authentication_status)
-st.write("DEBUG username:", username)
+st.write("DEBUG login_info:", login_info)
+
+if login_info is not None:
+    authentication_status = login_info.get("authentication_status")
+    name = login_info.get("name")
+    username = login_info.get("username")
+else:
+    authentication_status = None
+    name = None
+    username = None
 
 # Control de flujo de acceso
 if authentication_status:
