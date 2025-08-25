@@ -1,7 +1,7 @@
 credentials:
   usernames:
     admin:
-      email: operaciones@translogisticla.com
+      email:  
       name: Admin
       password: $2b$12$TAKRqhIAnPNpV8p3b3i2xumYtGUQjpcZF0AxiEvturL4ReMsFoOCG
     apaz:
@@ -29,3 +29,6 @@ cookie:
   name: "mylocaldata_cookie"
   key: "4%£`r89O5Yda"  # cámbialo por algo largo y único
   expiry_days: 30
+
+preauthorized:
+  emails: []
