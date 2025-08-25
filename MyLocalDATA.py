@@ -28,7 +28,13 @@ authenticator = stauth.Authenticate(
     config['cookie']['expiry_days'],
 )
 
-name, authentication_status, username = authenticator.login(location="sidebar")
+login_info = authenticator.login(location="sidebar")
+
+if login_info:
+    name = login_info["name"]
+    authentication_status = login_info["authentication_status"]
+    username = login_info["username"]
+
 
 if authentication_status:
     st.sidebar.success(f"Bienvenido, {name} 👋")
