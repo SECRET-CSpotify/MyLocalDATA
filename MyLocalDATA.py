@@ -17,38 +17,26 @@ st.set_page_config(page_title="Gestor de Clientes", layout="wide")
 
 # --------------------------
 # Autenticación
-with open("auth_config.yaml") as file:
-    config = yaml.load(file, Loader=SafeLoader)
+with open("auth_config.yaml", "r") as file:
+    try:
+        config = yaml.load(file, Loader=SafeLoader)
+    except Exception as e:
+        st.error(f"No se pudo cargar auth_config.yaml: {e}")
+        st.stop()
 
 authenticator = stauth.Authenticate(
-    config['credentials'],
-    config['cookie']['name'],
-    config['cookie']['key'],
-    config['cookie']['expiry_days'],
+    config["credentials"],
+    config["cookie"]["name"],
+    config["cookie"]["key"],
+    config["cookie"]["expiry_days"],
 )
 
-# Inicializar variables
-authentication_status = None
-name = None
-username = None
-
-# Login
-login_info = authenticator.login(location="sidebar")
-
-if login_info:
-    authentication_status = login_info.get("authentication_status")
-    name = login_info.get("name")
-    username = login_info.get("username")
-
-# DEBUG seguro
-st.write("DEBUG authentication_status:", authentication_status)
-st.write("DEBUG name:", name)
-st.write("DEBUG username:", username)
-
+# Desempaquetar la tupla correctamente
+name, authentication_status, username = authenticator.login("Ingresar", "sidebar")
 
 # Control de acceso
 if authentication_status:
-    st.sidebar.success(f"Bienvenido, {name} 👋")
+    st.sidebar.success(f"Bienvenido, {name}")
     authenticator.logout("Cerrar sesión", "sidebar")
     
     # ⬇️ Todo el resto de tu aplicación va dentro de este bloque
