@@ -33,7 +33,7 @@ name = None
 username = None
 
 # Login
-login_info = authenticator.login(location="sidebar")
+login_info = authenticator.login(name="Iniciar Sesión", location="sidebar")
 
 if login_info:
     authentication_status = login_info.get("authentication_status")
