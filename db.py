@@ -1,11 +1,7 @@
 # db.py
 import os
 from sqlalchemy import create_engine, text
-from dotenv import load_dotenv
 import pandas as pd
-
-# Cargar credenciales
-load_dotenv("DATA.env")
 
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
