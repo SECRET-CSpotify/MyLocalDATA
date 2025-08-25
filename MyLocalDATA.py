@@ -10,21 +10,17 @@ from db import crear_tabla, agregar_cliente, obtener_clientes, actualizar_client
 # --------------------------
 # Configuración general
 # --------------------------
-# --------------------------
-# Configuración general
-# --------------------------
 st.set_page_config(page_title="Gestor de Clientes", layout="wide")
 
 # --------------------------
 # Autenticación
 # --------------------------
-
-# 1) Inicializar variables
+# Inicializar variables
 name = None
-authentication_status = None
 username = None
+authentication_status = None
 
-# 2) Cargar configuración de autenticación
+# Cargar configuración
 with open("auth_config.yaml", "r") as file:
     try:
         config = yaml.load(file, Loader=SafeLoader)
@@ -32,7 +28,7 @@ with open("auth_config.yaml", "r") as file:
         st.error(f"No se pudo cargar auth_config.yaml: {e}")
         st.stop()
 
-# 3) Crear el autenticador
+# Crear autenticador
 authenticator = stauth.Authenticate(
     config["credentials"],
     config["cookie"]["name"],
@@ -40,44 +36,38 @@ authenticator = stauth.Authenticate(
     config["cookie"]["expiry_days"],
 )
 
-# 4) Mostrar formulario de login (posicionales: nombre del formulario y ubicación)
-name, authentication_status, username = authenticator.login(
-    "Iniciar sesión",
-    "sidebar"
-)
+# Mostrar formulario de login en la barra lateral
+login_info = authenticator.login(location="sidebar")
 
-# --------------------------
+# Extraer credenciales si login_info existe
+if login_info:
+    authentication_status = login_info.get("authentication_status")
+    name                  = login_info.get("name")
+    username              = login_info.get("username")
+
 # Control de acceso
-# --------------------------
 if authentication_status:
+
     st.sidebar.success(f"Bienvenido, {name} 👋")
     authenticator.logout("Cerrar sesión", "sidebar")
-    
-    # ⬇️ Todo el resto de tu aplicación va dentro de este bloque
-    # Fondo animado y tipografía
+
+    # --------------------------
+    # Estilos personalizados
+    # --------------------------
     page_bg = """
     <style>
-    /* Importar fuente */
     @import url('https://fonts.googleapis.com/css2?family=Faculty+Glyphic&display=swap');
-
-    html, body, [class*="css"] {
-        font-family: 'Faculty Glyphic', sans-serif;
-    }
-
-    /* Fondo animado */
+    html, body, [class*="css"] { font-family: 'Faculty Glyphic', sans-serif; }
     [data-testid="stAppViewContainer"] {
-    background: linear-gradient(-45deg, #23a6d5, #23d5ab, #ff6f61, #6a11cb);
-    background-size: 400% 400%;
-    animation: gradientBG 15s ease infinite;
+        background: linear-gradient(-45deg, #23a6d5, #23d5ab, #ff6f61, #6a11cb);
+        background-size: 400% 400%;
+        animation: gradientBG 15s ease infinite;
     }
-
     @keyframes gradientBG {
         0% {background-position: 0% 50%;}
         50% {background-position: 100% 50%;}
         100% {background-position: 0% 50%;}
     }
-
-    /* Estilo de títulos */
     h1, h2, h3, h4, h5, h6, .stText {
         font-weight: bold !important;
         text-shadow: 1px 1px 2px black;
@@ -88,14 +78,14 @@ if authentication_status:
     st.markdown(page_bg, unsafe_allow_html=True)
 
     # --------------------------
-    # Conexión a BD (crear tabla si no existe)
+    # Base de datos
     # --------------------------
     crear_tabla()
 
     # --------------------------
-    # Funciones auxiliares
+    # Función de exportación
     # --------------------------
-    def exportar_excel(df):
+    def exportar_excel(df: pd.DataFrame) -> bytes:
         output = BytesIO()
         with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
             df.to_excel(writer, index=False, sheet_name="Clientes")
@@ -108,23 +98,23 @@ if authentication_status:
     st.markdown("<h2 style='text-align:center;'>Gestor de Clientes - Agencia de Carga Internacional</h2>", unsafe_allow_html=True)
 
     # --------------------------
-    # Formulario para registrar cliente
+    # Formulario de registro
     # --------------------------
     with st.expander("➕ Registrar Cliente"):
         with st.form("form_cliente"):
             col1, col2, col3 = st.columns(3)
             with col1:
-                nombre = st.text_input("Nombre Cliente")
-                nit = st.text_input("NIT")
-                contacto = st.text_input("Persona de Contacto")
+                nombre        = st.text_input("Nombre Cliente")
+                nit           = st.text_input("NIT")
+                contacto      = st.text_input("Persona de Contacto")
             with col2:
-                telefono = st.text_input("Teléfono")
-                email = st.text_input("Email")
-                ciudad = st.text_input("Ciudad")
+                telefono      = st.text_input("Teléfono")
+                email         = st.text_input("Email")
+                ciudad        = st.text_input("Ciudad")
             with col3:
                 fecha_contacto = st.date_input("Fecha de Contacto", datetime.today())
-                observacion = st.text_area("Observación")
-                contactado = st.checkbox("Cliente Contactado")
+                observacion    = st.text_area("Observación")
+                contactado     = st.checkbox("Cliente Contactado")
 
             submitted = st.form_submit_button("Guardar")
             if submitted:
@@ -143,7 +133,7 @@ if authentication_status:
                 st.success("✅ Cliente registrado correctamente")
 
     # --------------------------
-    # Tablas de clientes
+    # Listado de clientes
     # --------------------------
     tab1, tab2 = st.tabs(["📋 No Contactados", "✅ Contactados"])
 
@@ -154,22 +144,26 @@ if authentication_status:
         if filtro:
             df_no = df_no[df_no["nombre"].str.contains(filtro, case=False, na=False)]
         st.dataframe(df_no, use_container_width=True)
-
         if not df_no.empty:
-            st.download_button("⬇️ Exportar a Excel", data=exportar_excel(df_no),
-                            file_name="clientes_no_contactados.xlsx")
+            st.download_button(
+                "⬇️ Exportar a Excel",
+                data=exportar_excel(df_no),
+                file_name="clientes_no_contactados.xlsx"
+            )
 
     with tab2:
         df_si = obtener_clientes(contactado=True)
         st.subheader("Clientes Contactados")
         st.dataframe(df_si, use_container_width=True)
-
         if not df_si.empty:
-            st.download_button("⬇️ Exportar a Excel", data=exportar_excel(df_si),
-                            file_name="clientes_contactados.xlsx")
+            st.download_button(
+                "⬇️ Exportar a Excel",
+                data=exportar_excel(df_si),
+                file_name="clientes_contactados.xlsx"
+            )
 
     # --------------------------
-    # Vista detallada
+    # Vista detallada y edición
     # --------------------------
     st.markdown("---")
     st.subheader("🔎 Vista Detallada por Cliente")
@@ -177,30 +171,33 @@ if authentication_status:
     clientes = obtener_clientes()
     if not clientes.empty:
         seleccion = st.selectbox("Selecciona un cliente", clientes["nombre"])
-        cliente = clientes[clientes["nombre"] == seleccion].iloc[0]
+        cliente   = clientes[clientes["nombre"] == seleccion].iloc[0]
 
         with st.form("detalle_cliente"):
             st.write(f"### {cliente['nombre']} (NIT: {cliente['nit']})")
-            tipo_op = st.text_input("Tipo de Operación", cliente["tipo_operacion"] or "")
-            modalidad = st.text_input("Modalidad", cliente["modalidad"] or "")
-            origen = st.text_input("Origen", cliente["origen"] or "")
-            destino = st.text_input("Destino", cliente["destino"] or "")
-            mercancia = st.text_area("Mercancía", cliente["mercancia"] or "")
+            tipo_operacion = st.text_input("Tipo de Operación", cliente.get("tipo_operacion", ""))
+            modalidad      = st.text_input("Modalidad", cliente.get("modalidad", ""))
+            origen         = st.text_input("Origen", cliente.get("origen", ""))
+            destino        = st.text_input("Destino", cliente.get("destino", ""))
+            mercancia      = st.text_area("Mercancía", cliente.get("mercancia", ""))
+
             guardar = st.form_submit_button("💾 Guardar cambios")
             if guardar:
                 actualizar_cliente_detalle(
                     cliente["id"],
                     {
-                        "tipo_op": tipo_op,
-                        "modalidad": modalidad,
-                        "origen": origen,
-                        "destino": destino,
-                        "mercancia": mercancia
+                        "tipo_operacion": tipo_operacion,
+                        "modalidad":      modalidad,
+                        "origen":         origen,
+                        "destino":        destino,
+                        "mercancia":      mercancia
                     }
                 )
                 st.success("✅ Información detallada actualizada")
 
 elif authentication_status is False:
-    st.error("❌ Usuario o contraseña incorrectos")
-elif authentication_status is None:
-    st.warning("🔑 Por favor ingresa tus credenciales")
+    st.sidebar.error("❌ Usuario o contraseña incorrectos")
+
+else:  # authentication_status is None
+    st.sidebar.warning("🔑 Por favor ingresa tus credenciales")
+```
