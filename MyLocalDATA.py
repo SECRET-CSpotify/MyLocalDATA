@@ -15,7 +15,6 @@ st.set_page_config(page_title="Gestor de Clientes", layout="wide")
 # --------------------------
 # Autenticación
 # --------------------------
-
 # 1) Inicializar variables
 name = None
 authentication_status = None
@@ -30,37 +29,15 @@ with open("auth_config.yaml", "r") as file:
         st.stop()
 
 # 3) Crear el autenticador
-#    Asegúrate de que en tu YAML uses:
-#
-#    credentials:
-#      usernames:
-#        juanperez:
-#          name: "Juan Pérez"
-#          password: "1234"
-#    cookie:
-#      name: "app_cookie"
-#      key: "alguna_clave_super_secreta"
-#      expiry_days: 30
-#
-#    Si tu contraseña está en texto plano, añade raw_passwords=True:
 authenticator = stauth.Authenticate(
     config["credentials"],
     config["cookie"]["name"],
     config["cookie"]["key"],
     config["cookie"]["expiry_days"],
-    # raw_passwords=True   # Descomenta si tus passwords no están hasheadas
 )
 
-# 4) Mostrar el formulario de login en la sidebar
-#    (devuelve una tupla: nombre, estado, username)
-name, authentication_status, username = authenticator.login("Iniciar sesión", "sidebar")
-
-# 5) DEBUG: ver en la ui qué devuelve el login
-st.sidebar.write("DEBUG →", {
-    "name": name,
-    "authentication_status": authentication_status,
-    "username": username
-})
+# 4) Llamar a login() pasando sólo location
+name, authentication_status, username = authenticator.login(location="sidebar")
 
 # --------------------------
 # Control de acceso
@@ -97,12 +74,12 @@ if authentication_status:
     st.markdown(page_bg, unsafe_allow_html=True)
 
     # --------------------------
-    # Base de datos
+    # Conexión a BD (crear tabla si no existe)
     # --------------------------
     crear_tabla()
 
     # --------------------------
-    # Función de exportación
+    # Función auxiliar: exportar a Excel
     # --------------------------
     def exportar_excel(df: pd.DataFrame) -> bytes:
         output = BytesIO()
@@ -117,7 +94,7 @@ if authentication_status:
     st.markdown("<h2 style='text-align:center;'>Gestor de Clientes - Agencia de Carga Internacional</h2>", unsafe_allow_html=True)
 
     # --------------------------
-    # Formulario de registro
+    # Formulario para registrar cliente
     # --------------------------
     with st.expander("➕ Registrar Cliente"):
         with st.form("form_cliente"):
@@ -135,8 +112,7 @@ if authentication_status:
                 observacion    = st.text_area("Observación")
                 contactado     = st.checkbox("Cliente Contactado")
 
-            submitted = st.form_submit_button("Guardar")
-            if submitted:
+            if st.form_submit_button("Guardar"):
                 datos = {
                     "nombre": nombre,
                     "nit": nit,
@@ -152,7 +128,7 @@ if authentication_status:
                 st.success("✅ Cliente registrado correctamente")
 
     # --------------------------
-    # Listados y exportación
+    # Listado y exportación de clientes
     # --------------------------
     tab1, tab2 = st.tabs(["📋 No Contactados", "✅ Contactados"])
 
@@ -182,7 +158,7 @@ if authentication_status:
             )
 
     # --------------------------
-    # Vista detallada
+    # Vista detallada y edición
     # --------------------------
     st.markdown("---")
     st.subheader("🔎 Vista Detallada por Cliente")
@@ -200,8 +176,7 @@ if authentication_status:
             destino        = st.text_input("Destino", cliente.get("destino", ""))
             mercancia      = st.text_area("Mercancía", cliente.get("mercancia", ""))
 
-            guardar = st.form_submit_button("💾 Guardar cambios")
-            if guardar:
+            if st.form_submit_button("💾 Guardar cambios"):
                 actualizar_cliente_detalle(
                     cliente["id"],
                     {
@@ -217,5 +192,5 @@ if authentication_status:
 elif authentication_status is False:
     st.sidebar.error("❌ Usuario o contraseña incorrectos")
 
-else:
+else:  # authentication_status is None
     st.sidebar.warning("🔑 Por favor ingresa tus credenciales")
