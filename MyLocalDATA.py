@@ -28,7 +28,7 @@ authenticator = stauth.Authenticate(
 )
 
 # login devuelve una tupla: name, authentication_status, username
-name, authentication_status, username = authenticator.login("Iniciar Sesión", location="sidebar")
+name, authentication_status, username = authenticator.login(location="sidebar")
 
 # Control de flujo de acceso
 if authentication_status:
