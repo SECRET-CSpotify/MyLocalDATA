@@ -29,7 +29,7 @@ authenticator = stauth.Authenticate(
 
 # login devuelve un diccionario o None
 # Renderizar formulario de login en sidebar
-authenticator.login("Iniciar Sesión", "sidebar")
+authenticator.login(location="sidebar")
 
 # Comprobar el estado de autenticación
 authentication_status = st.session_state.get("authentication_status")
