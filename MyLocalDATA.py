@@ -17,6 +17,17 @@ st.set_page_config(page_title="Gestor de Clientes", layout="wide")
 
 # --------------------------
 # Autenticación
+import streamlit as st
+import yaml
+from yaml.loader import SafeLoader
+import streamlit_authenticator as stauth
+
+# Inicializar variables por defecto
+authentication_status = None
+name = None
+username = None
+
+# Cargar configuración de autenticación
 with open("auth_config.yaml", "r") as file:
     try:
         config = yaml.load(file, Loader=SafeLoader)
@@ -24,6 +35,7 @@ with open("auth_config.yaml", "r") as file:
         st.error(f"No se pudo cargar auth_config.yaml: {e}")
         st.stop()
 
+# Crear el autenticador
 authenticator = stauth.Authenticate(
     config["credentials"],
     config["cookie"]["name"],
@@ -31,18 +43,18 @@ authenticator = stauth.Authenticate(
     config["cookie"]["expiry_days"],
 )
 
-# Desempaquetar la tupla correctamente
-login_info = authenticator.login(location="sidebar")
+# Mostrar el formulario de login en la barra lateral
+login_info = authenticator.login(form_name="Iniciar sesión", location="sidebar")
 
+# Extraer valores sólo si login_info no es None
 if login_info:
-    authentication_status = login_info["authentication_status"]
-    name                  = login_info["name"]
-    username              = login_info["username"]
-
+    authentication_status = login_info.get("authentication_status")
+    name                  = login_info.get("name")
+    username              = login_info.get("username")
 
 # Control de acceso
 if authentication_status:
-    st.sidebar.success(f"Bienvenido, {name}")
+    st.sidebar.success(f"Bienvenido, {name} 👋")
     authenticator.logout("Cerrar sesión", "sidebar")
     
     # ⬇️ Todo el resto de tu aplicación va dentro de este bloque
