@@ -28,14 +28,17 @@ authenticator = stauth.Authenticate(
     config['cookie']['expiry_days'],
 )
 
+# Inicializamos siempre para evitar NameError
+name, username, authentication_status = None, None, None
+
 login_info = authenticator.login(location="sidebar")
 
 if login_info:
-    name = login_info["name"]
-    authentication_status = login_info["authentication_status"]
-    username = login_info["username"]
+    name = login_info.get("name")
+    authentication_status = login_info.get("authentication_status")
+    username = login_info.get("username")
 
-
+# Control de flujo de acceso
 if authentication_status:
     st.sidebar.success(f"Bienvenido, {name} 👋")
     authenticator.logout("Cerrar sesión", "sidebar")
