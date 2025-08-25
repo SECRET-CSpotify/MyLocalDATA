@@ -17,11 +17,9 @@ st.set_page_config(page_title="Gestor de Clientes", layout="wide")
 
 # --------------------------
 # Autenticación
-# Cargar configuración
 with open("auth_config.yaml") as file:
     config = yaml.load(file, Loader=SafeLoader)
 
-# Inicializar autenticador
 authenticator = stauth.Authenticate(
     config['credentials'],
     config['cookie']['name'],
@@ -29,8 +27,8 @@ authenticator = stauth.Authenticate(
     config['cookie']['expiry_days'],
 )
 
-# Mostrar login
-login_info = authenticator.login("Iniciar Sesión", location="sidebar")
+# Mostrar login en la sidebar
+login_info = authenticator.login(location="sidebar")  # SOLO location
 
 # login_info es un diccionario o None
 if login_info:
