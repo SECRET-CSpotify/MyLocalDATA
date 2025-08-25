@@ -32,7 +32,13 @@ authenticator = stauth.Authenticate(
 )
 
 # Desempaquetar la tupla correctamente
-name, authentication_status, username = authenticator.login("Ingresar", "sidebar")
+login_info = authenticator.login(location="sidebar")
+
+if login_info:
+    authentication_status = login_info["authentication_status"]
+    name                  = login_info["name"]
+    username              = login_info["username"]
+
 
 # Control de acceso
 if authentication_status:
