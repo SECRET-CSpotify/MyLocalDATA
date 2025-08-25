@@ -17,7 +17,6 @@ st.set_page_config(page_title="Gestor de Clientes", layout="wide")
 
 # --------------------------
 # Autenticación
-# --------------------------
 with open("auth_config.yaml") as file:
     config = yaml.load(file, Loader=SafeLoader)
 
@@ -28,19 +27,8 @@ authenticator = stauth.Authenticate(
     config['cookie']['expiry_days'],
 )
 
-# Inicializamos siempre para evitar NameError
-name, username, authentication_status = None, None, None
-
-st.sidebar.subheader("🔐 Iniciar Sesión")
-login_info = authenticator.login(location="sidebar")
-
-st.write("DEBUG login_info:", login_info)
-
-
-if login_info:
-    name = login_info.get("name")
-    authentication_status = login_info.get("authentication_status")
-    username = login_info.get("username")
+# login devuelve una tupla: name, authentication_status, username
+name, authentication_status, username = authenticator.login("Iniciar Sesión", location="sidebar")
 
 # Control de flujo de acceso
 if authentication_status:
