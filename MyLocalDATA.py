@@ -27,21 +27,24 @@ authenticator = stauth.Authenticate(
     config['cookie']['expiry_days'],
 )
 
-# Mostrar login en la sidebar
-login_info = authenticator.login(location="sidebar")  # SOLO location
+# Inicializar variables
+authentication_status = None
+name = None
+username = None
 
-# login_info es un diccionario o None
+# Login
+login_info = authenticator.login(location="sidebar")
+
 if login_info:
     authentication_status = login_info.get("authentication_status")
     name = login_info.get("name")
     username = login_info.get("username")
-else:
-    authentication_status = None
 
-# DEBUG
+# DEBUG seguro
 st.write("DEBUG authentication_status:", authentication_status)
 st.write("DEBUG name:", name)
 st.write("DEBUG username:", username)
+
 
 # Control de acceso
 if authentication_status:
