@@ -24,3 +24,12 @@ credentials:
       email: operaciones2@translogisticla.com
       name: Stefany Espitia
       password: $2b$12$UFuG0rFkmw7WIrX8HrYDve0so.B.zN.A4S1oWZsu.Yzk1AP3vnHsC
+
+cookie:
+  name: "mylocaldata_cookie"
+  key: "4%£`r89O5Yda"  # cámbialo por algo largo y único
+  expiry_days: 30
+
+preauthorized:
+  emails:
+    - "operaciones@translogisticla.com"
