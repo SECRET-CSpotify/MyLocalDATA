@@ -30,12 +30,12 @@ authenticator = stauth.Authenticate(
 )
 
 # Mostrar login en la sidebar
-name, authentication_status, username = authenticator.login(location="sidebar")
+login_info = authenticator.login(location="sidebar")
 
-# Obtener el estado desde session_state
-authentication_status = st.session_state.get("authentication_status")
-name = st.session_state.get("name")
-username = st.session_state.get("username")
+# login_info es un diccionario, no una tupla
+name = login_info.get("name") if login_info else None
+username = login_info.get("username") if login_info else None
+authentication_status = login_info.get("authentication_status") if login_info else None
 
 # DEBUG
 st.write("DEBUG authentication_status:", authentication_status)
