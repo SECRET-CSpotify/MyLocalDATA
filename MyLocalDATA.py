@@ -29,13 +29,16 @@ authenticator = stauth.Authenticate(
     config['cookie']['expiry_days'],
 )
 
-# Mostrar login en la sidebar
-login_info = authenticator.login(location="sidebar")
+# Mostrar login
+login_info = authenticator.login("Iniciar Sesión", location="sidebar")
 
-# login_info es un diccionario, no una tupla
-name = login_info.get("name") if login_info else None
-username = login_info.get("username") if login_info else None
-authentication_status = login_info.get("authentication_status") if login_info else None
+# login_info es un diccionario o None
+if login_info:
+    authentication_status = login_info.get("authentication_status")
+    name = login_info.get("name")
+    username = login_info.get("username")
+else:
+    authentication_status = None
 
 # DEBUG
 st.write("DEBUG authentication_status:", authentication_status)
