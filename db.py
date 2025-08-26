@@ -31,31 +31,41 @@ def crear_tabla():
                 fecha_contacto DATE,
                 observacion TEXT,
                 contactado BOOLEAN DEFAULT FALSE,
+                username TEXT,               -- <-- añadido
                 tipo_operacion TEXT,
                 modalidad TEXT,
                 origen TEXT,
                 destino TEXT,
                 mercancia TEXT
             );
+            CREATE INDEX IF NOT EXISTS idx_clientes_username ON clientes(username);
         """))
 
 def agregar_cliente(datos):
     with engine.begin() as conn:
         conn.execute(text("""
-            INSERT INTO clientes (nombre, nit, contacto, telefono, email, ciudad, fecha_contacto, observacion, contactado, username)
-            VALUES (:nombre, :nit, :contacto, :telefono, :email, :ciudad, :fecha_contacto, :observacion, :contactado, :username)
+            INSERT INTO clientes (
+                nombre, nit, contacto, telefono, email, ciudad,
+                fecha_contacto, observacion, contactado, username
+            ) VALUES (
+                :nombre, :nit, :contacto, :telefono, :email, :ciudad,
+                :fecha_contacto, :observacion, :contactado, :username
+            )
         """), datos)
 
 def obtener_clientes(contactado=None, username=None, is_admin=False):
-    query = "SELECT * FROM clientes"
-    conditions = []
+    sql = "SELECT * FROM clientes"
+    clauses = []
+    params = {}
     if contactado is not None:
-        conditions.append(f"contactado={str(contactado).lower()}")
+        clauses.append("contactado = :contactado")
+        params["contactado"] = contactado
     if username and not is_admin:
-        conditions.append(f"username='{username}'")
-    if conditions:
-        query += " WHERE " + " AND ".join(conditions)
-    return pd.read_sql(query, engine)
+        clauses.append("username = :username")
+        params["username"] = username
+    if clauses:
+        sql += " WHERE " + " AND ".join(clauses)
+    return pd.read_sql(sql, engine, params=params)
 
 def actualizar_cliente_detalle(cliente_id, datos):
     with engine.begin() as conn:

@@ -226,20 +226,19 @@ if authentication_status:
                     "ciudad": ciudad,
                     "fecha_contacto": str(fecha_contacto),
                     "observacion": observacion,
-                    "contactado": contactado
+                    "contactado": contactado,
+                    "username": username  # <-- agrega el username actual de la sesión
                 }
-                # Añadir username al diccionario de datos
-                agregar_cliente({**datos, "username": username})
+                agregar_cliente(datos)
                 st.success("✅ Cliente registrado correctamente")
 
     # --------------------------
     # Listado y exportación de clientes
     # --------------------------
     tab1, tab2 = st.tabs(["📋 No Contactados", "✅ Contactados"])
-    ALTER TABLE clientes ADD COLUMN username TEXT NOT NULL;
 
     with tab1:
-        df_no = obtener_clientes(contactado=False)
+        df_no = obtener_clientes(contactado=False, username=username, is_admin=is_admin)
         st.subheader("Clientes No Contactados")
         filtro = st.text_input("🔍 Buscar cliente")
         if filtro:
@@ -253,7 +252,7 @@ if authentication_status:
             )
 
     with tab2:
-        df_si = obtener_clientes(contactado=True)
+        df_si = obtener_clientes(contactado=True, username=username, is_admin=is_admin)
         st.subheader("Clientes Contactados")
         st.dataframe(df_si, use_container_width=True)
         if not df_si.empty:
@@ -269,10 +268,10 @@ if authentication_status:
     st.markdown("---")
     st.subheader("🔎 Vista Detallada por Cliente")
 
-    clientes = obtener_clientes()
+    clientes = obtener_clientes(username=username, is_admin=is_admin)
     if not clientes.empty:
         seleccion = st.selectbox("Selecciona un cliente", clientes["nombre"])
-        cliente   = clientes[clientes["nombre"] == seleccion].iloc[0]
+        cliente = clientes[clientes["nombre"] == seleccion].iloc[0]
 
         with st.form("detalle_cliente"):
             st.write(f"### {cliente['nombre']} (NIT: {cliente['nit']})")
