@@ -1,5 +1,6 @@
 # Ignorar archivo de variables de entorno
 DATA.env
+hash_passwords.py
 
 # Ignorar cachés de Python
 __pycache__/

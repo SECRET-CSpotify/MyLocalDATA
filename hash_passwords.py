@@ -3,12 +3,12 @@ from streamlit_authenticator.utilities import Hasher
 
 # Lista de contraseñas en texto plano
 passwords = [
-    "P:NmZq%512U+",   # para admin
-    "X9X;5Pidhe~9",   # para Andres Paz
-    "c4Q-_£578;[!",   # para Laura Peña
-    "8;v^01mMF5",     # para David Gaviria
-    "oYI!/E545AdA",   # para Sergio Martinez
-    "hV694)OE3wD)"    # para Stefany Espitia
+    "5{£g;My$985j",   # para admin
+    "udJ_)l2*72Jo",   # para Andres Paz
+    "`89eJ£sk57T$",   # para Laura Peña
+    "Ic{99jaW4TW2",     # para David Gaviria
+    "=C6Z94!iP6Nu",   # para Sergio Martinez
+    "7,zYX;c6jl3G"    # para Stefany Espitia
 ]
 
 # Generar hashes para cada contraseña

@@ -42,14 +42,19 @@ def crear_tabla():
 def agregar_cliente(datos):
     with engine.begin() as conn:
         conn.execute(text("""
-            INSERT INTO clientes (nombre, nit, contacto, telefono, email, ciudad, fecha_contacto, observacion, contactado)
-            VALUES (:nombre, :nit, :contacto, :telefono, :email, :ciudad, :fecha_contacto, :observacion, :contactado)
+            INSERT INTO clientes (nombre, nit, contacto, telefono, email, ciudad, fecha_contacto, observacion, contactado, username)
+            VALUES (:nombre, :nit, :contacto, :telefono, :email, :ciudad, :fecha_contacto, :observacion, :contactado, :username)
         """), datos)
 
-def obtener_clientes(contactado=None):
+def obtener_clientes(contactado=None, username=None, is_admin=False):
     query = "SELECT * FROM clientes"
+    conditions = []
     if contactado is not None:
-        query += f" WHERE contactado={str(contactado).lower()}"
+        conditions.append(f"contactado={str(contactado).lower()}")
+    if username and not is_admin:
+        conditions.append(f"username='{username}'")
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
     return pd.read_sql(query, engine)
 
 def actualizar_cliente_detalle(cliente_id, datos):

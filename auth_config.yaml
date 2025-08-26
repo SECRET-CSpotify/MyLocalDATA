@@ -1,31 +1,4 @@
-credentials:
-  usernames:
-    admin:
-      name: Admin
-      email: operaciones@translogisticla.com
-      password: $2b$12$rw35.fQI.Hwh6i0ygSj9EO9wWskH.uxr4Fq3FVLJI0OdeYGoEqWP.
-    apaz:
-      name: Andres Paz
-      email: comercial2@translogisticla.com
-      password: $2b$12$9BciQ1GKn9pYTt8UCPQFe.ovoJ41kdjNJegAMxBojPwanKJp97pdO
-    lpena:
-      name: Laura Peña
-      email: comercialclo@translogisticla.com
-      password: $2b$12$LM3m7qadxNXTwFlbvj0fNuSLZoi0EonyBBo.uiakEymC/ZB/C6b4K
-    dgaviria:
-      name: David Gaviria
-      email: dgaviria@translogisticla.com
-      password: $2b$12$lO3RB7BmCRkMttXZPjGb3.t8WJpVvKHhk1udDxVF.QzPu2pw5Eu82
-    smartinez:
-      name: Sergio Martinez
-      email: gerencia@translogisticla.com
-      password: $2b$12$SLmOV2WoMC2eNXOjmgX6Uuy7ZtjZatKd5RVpLxaFKJ157iaAqyHea
-    sespitia:
-      name: Stefany Espitia
-      email: operaciones2@translogisticla.com
-      password: $2b$12$oa.9kvR2Tluem4v6aktcOu/bxvrEuA2F/Ua.iDQawpAFO19YnWctm
-
-cookie:
+  cookie:
   name: "mylocaldata_cookie"
   key: "4%£`r89O5Yda"  # cámbialo por algo largo y único
   expiry_days: 30

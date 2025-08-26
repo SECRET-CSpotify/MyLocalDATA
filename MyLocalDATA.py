@@ -21,23 +21,30 @@ authentication_status = None
 username = None
 
 # 2) Cargar configuración de autenticación
-with open("auth_config.yaml", "r") as file:
-    try:
-        config = yaml.load(file, Loader=SafeLoader)
-    except Exception as e:
-        st.error(f"No se pudo cargar auth_config.yaml: {e}")
-        st.stop()
+import json
+import streamlit as st
+import streamlit_authenticator as stauth
 
-# 3) Crear el autenticador
+# Cargar usuarios desde secretos de Streamlit
+users_json = st.secrets["USERS"]  # Streamlit Secrets
+users = json.loads(users_json)
+
 authenticator = stauth.Authenticate(
-    config["credentials"],
-    config["cookie"]["name"],
-    config["cookie"]["key"],
-    config["cookie"]["expiry_days"],
+    users,
+    st.secrets["COOKIE_NAME"],
+    st.secrets["COOKIE_KEY"],
+    expiry_days = int(st.secrets.get("COOKIE_EXPIRY_DAYS", 30))
 )
+
 
 # 4) Llamar a login() pasando sólo location
 name, authentication_status, username = authenticator.login(location="sidebar")
+# Mejor usar un rol definido en los secretos
+is_admin = users[username].get("role") == "admin"
+
+
+df_no = obtener_clientes(contactado=False, username=username, is_admin=is_admin)
+
 
 # --------------------------
 # Control de acceso
@@ -77,7 +84,7 @@ if authentication_status:
     # Conexión a BD (crear tabla si no existe)
     # --------------------------
     crear_tabla()
-
+    
     # --------------------------
     # Función auxiliar: exportar a Excel
     # --------------------------
@@ -124,13 +131,15 @@ if authentication_status:
                     "observacion": observacion,
                     "contactado": contactado
                 }
-                agregar_cliente(datos)
+                # Añadir username al diccionario de datos
+                agregar_cliente({**datos, "username": username})
                 st.success("✅ Cliente registrado correctamente")
 
     # --------------------------
     # Listado y exportación de clientes
     # --------------------------
     tab1, tab2 = st.tabs(["📋 No Contactados", "✅ Contactados"])
+    ALTER TABLE clientes ADD COLUMN username TEXT NOT NULL;
 
     with tab1:
         df_no = obtener_clientes(contactado=False)
