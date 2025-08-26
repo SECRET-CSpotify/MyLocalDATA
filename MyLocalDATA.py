@@ -14,14 +14,10 @@ st.set_page_config(page_title="Gestor de Clientes", layout="wide")
 
 # --------------------------
 # ------------------ Bloque de autenticación robusto (pegar aquí) ------------------
-import streamlit as st
-import streamlit_authenticator as stauth
 import traceback
-from collections.abc import Mapping
 
 # Bloque de autenticación (sin debug)
 # --------------------------
-import streamlit_authenticator as stauth
 from collections.abc import Mapping
 
 def normalize_credentials_from_secrets():
@@ -62,7 +58,8 @@ def normalize_credentials_from_secrets():
 
 credentials = normalize_credentials_from_secrets()
 if credentials is None:
-    st.error("No se detectaron credenciales válidas en st.secrets. Asegúrate del formato (ver ejemplo).")
+    st.error("No se detectaron credenciales válidas en st.secrets." \
+    "Asegúrate del formato (ver ejemplo).")
     st.stop()
 
 # Validar cookies
