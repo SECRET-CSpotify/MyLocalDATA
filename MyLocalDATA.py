@@ -20,120 +20,125 @@ name = None
 authentication_status = None
 username = None
 
-# 2) Cargar configuración de autenticación
-# --- bloque robusto de autenticación (reemplaza el tuyo) ---
+# --- BLOQUE DE DIAGNÓSTICO: pega esto en lugar del bloque de autenticación ---
 import streamlit as st
 import streamlit_authenticator as stauth
-import traceback
+import inspect, traceback
 
+st.markdown("## DEBUG - diagnóstico de autenticación (temporal)")
+
+# 1) versión y firmas
+try:
+    st.write("stauth version:", getattr(stauth, "__version__", "unknown"))
+except Exception:
+    st.write("No pude obtener stauth.__version__")
+
+try:
+    st.write("Authenticate.__init__ signature:", inspect.signature(stauth.Authenticate.__init__))
+    # la función login es método de instancia, inspeccionamos la función en la clase
+    st.write("Authenticate.login signature:", inspect.signature(stauth.Authenticate.login))
+except Exception:
+    st.write("No pude inspeccionar firmas de Authenticate.")
+    st.text(traceback.format_exc())
+
+# 2) mostrar keys en secrets y una vista segura de la estructura
+try:
+    st.write("Keys en st.secrets:", list(st.secrets.keys()))
+    # Muestra si existe 'credentials' o 'USERS' y qué forma tienen (sin mostrar passwords)
+    if "credentials" in st.secrets:
+        creds = st.secrets["credentials"]
+        st.write("Tipo de 'credentials':", type(creds).__name__)
+        if isinstance(creds, dict):
+            # si tiene 'usernames' mostramos solo los nombres
+            if "usernames" in creds and isinstance(creds["usernames"], dict):
+                st.write("usernames detectados en credentials:", list(creds["usernames"].keys()))
+            else:
+                st.write("keys en credentials (primer nivel):", list(creds.keys()))
+    if "USERS" in st.secrets:
+        users = st.secrets["USERS"]
+        st.write("Tipo de 'USERS':", type(users).__name__)
+        if isinstance(users, list):
+            st.write("Longitud USERS:", len(users))
+            try:
+                st.write("Usernames list (USERS):", [u.get("username") for u in users if isinstance(u, dict)])
+            except Exception:
+                st.write("No pude listar usernames en USERS.")
+except Exception:
+    st.text("Error leyendo secrets:\n" + traceback.format_exc())
+
+# 3) Normalizar credenciales (igual que antes) y probar instanciación + login con captura de errores
 def normalize_credentials_from_secrets():
-    """
-    Devuelve un objeto 'credentials' listo para pasar a stauth.Authenticate.
-    Acepta dos formatos comunes en Streamlit secrets:
-      1) Lista: [[USERS]] -> st.secrets["USERS"]  (lista de dicts con 'username')
-      2) Diccionario: [credentials.usernames.<user>] -> st.secrets["credentials"]
-    """
-    # Intenta obtener la forma recomendada primero
     creds = st.secrets.get("credentials")
     if creds:
-        # Si ya viene como credentials con 'usernames', devolverlo tal cual
         if isinstance(creds, dict) and "usernames" in creds:
             return creds
-        # Si creds es un dict pero no tiene 'usernames', podría estar en forma [credentials.<user>]
-        # Convertir a { "usernames": { username: {name,email,password} } }
         if isinstance(creds, dict):
             usernames = {}
             for k, v in creds.items():
-                # v debería contener name, email, password
                 if isinstance(v, dict) and "name" in v:
-                    usernames[k] = {
-                        "name": v.get("name"),
-                        "email": v.get("email"),
-                        "password": v.get("password"),
-                    }
+                    usernames[k] = {"name": v.get("name"), "email": v.get("email"), "password": v.get("password")}
             return {"usernames": usernames}
 
-    # Si no hay 'credentials', revisa si vienen como lista [[USERS]]
     users_list = st.secrets.get("USERS")
     if users_list and isinstance(users_list, list):
         usernames = {}
         for u in users_list:
-            # cada 'u' = dict con keys username, name, email, password
+            if not isinstance(u, dict):
+                continue
             uname = u.get("username") or u.get("name")
             if not uname:
                 continue
-            usernames[uname] = {
-                "name": u.get("name"),
-                "email": u.get("email"),
-                "password": u.get("password"),
-            }
+            usernames[uname] = {"name": u.get("name"), "email": u.get("email"), "password": u.get("password")}
         return {"usernames": usernames}
 
-    # Si llegamos aquí, no encontramos credenciales en un formato conocido
     return None
 
-# DEBUG seguro: mostrar solo estructura y nombres de usuario (no valores sensibles)
-try:
-    st.write("DEBUG: keys in st.secrets ->", list(st.secrets.keys()))
-    creds_candidate = st.secrets.get("credentials") or st.secrets.get("USERS")
-    st.write("DEBUG: credentials present?:", creds_candidate is not None)
-    if isinstance(creds_candidate, dict):
-        st.write("DEBUG: credentials keys:", list(creds_candidate.keys()))
-    elif isinstance(creds_candidate, list):
-        st.write("DEBUG: USERS list length:", len(creds_candidate))
-        st.write("DEBUG: USERS usernames:", [u.get("username") for u in creds_candidate if isinstance(u, dict)])
-except Exception:
-    st.text("DEBUG read error:\n" + traceback.format_exc())
-
-# Normalizar
 credentials = normalize_credentials_from_secrets()
 if credentials is None:
-    st.error("No se encontraron credenciales válidas en Streamlit Secrets. Revisa el formato (usa 'credentials' con 'usernames' o 'USERS' lista).")
+    st.error("No se detectaron credenciales válidas en st.secrets ('credentials' o 'USERS').")
     st.stop()
 
-# muestra sólo los usernames para confirmar
-try:
-    st.write("DEBUG: detected usernames:", list(credentials.get("usernames", {}).keys()))
-except Exception:
-    st.write("DEBUG: unable to list usernames")
+st.write("DEBUG: credenciales normalizadas - usernames:", list(credentials.get("usernames", {}).keys()))
 
-# Cargar cookies/expiry
-try:
-    cookie_name = st.secrets["COOKIE_NAME"]
-    cookie_key = st.secrets["COOKIE_KEY"]
-    cookie_expiry = int(st.secrets.get("COOKIE_EXPIRY_DAYS", 30))
-except Exception:
-    st.error("Faltan secrets de cookies (COOKIE_NAME/COOKIE_KEY/COOKIE_EXPIRY_DAYS).")
+# Cargar cookies/expiry (validar existencia)
+missing = []
+for key in ("COOKIE_NAME", "COOKIE_KEY", "COOKIE_EXPIRY_DAYS"):
+    if key not in st.secrets:
+        missing.append(key)
+if missing:
+    st.error("Faltan estas keys en st.secrets: " + ", ".join(missing))
     st.stop()
 
-# Instanciar Authenticate con manejo de error para mostrar la traza real
+cookie_name = st.secrets["COOKIE_NAME"]
+cookie_key = st.secrets["COOKIE_KEY"]
 try:
-    authenticator = stauth.Authenticate(
-        credentials,  # debe tener la estructura {"usernames": {...}}
-        cookie_name,
-        cookie_key,
-        cookie_expiry
-    )
-except Exception as e:
-    st.error("Error al instanciar stauth.Authenticate — muestro traza:")
+    cookie_expiry = int(st.secrets["COOKIE_EXPIRY_DAYS"])
+except Exception:
+    st.error("COOKIE_EXPIRY_DAYS no es un entero válido.")
+    st.stop()
+
+# Intentar crear authenticator y llamar login con captura de excepciones
+try:
+    authenticator = stauth.Authenticate(credentials, cookie_name, cookie_key, cookie_expiry)
+    st.write("Authenticator creado OK.")
+except Exception:
+    st.error("Error al crear authenticator — traza completa abajo:")
     st.text(traceback.format_exc())
     st.stop()
 
-# Login (capturar excepción para ver la traza completa)
 try:
+    # Llamada a login envuelta para capturar cualquier TypeError u otro
     name, authentication_status, username = authenticator.login(location="sidebar")
-except Exception as e:
-    st.error("Error en authenticator.login() — muestro traza completa:")
+    st.write("login() devolvió:", {"name": name, "authentication_status": authentication_status, "username": username})
+except Exception:
+    st.error("Error al ejecutar authenticator.login() — traza completa abajo:")
     st.text(traceback.format_exc())
     st.stop()
 
-# identifica admin de forma flexible
-is_admin = False
-if username:
-    is_admin = (username == "admin") or (username == st.secrets.get("ADMIN_USER"))
-
-# --- fin del bloque ---
-
+# indica admin (solo como info)
+is_admin = username == "admin"
+st.write("is_admin (username == 'admin') =>", is_admin)
+# --- fin del bloque de diagnóstico ---
 
 df_no = obtener_clientes(contactado=False, username=username, is_admin=is_admin)
 
