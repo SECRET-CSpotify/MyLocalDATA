@@ -21,23 +21,119 @@ authentication_status = None
 username = None
 
 # 2) Cargar configuración de autenticación
+# --- bloque robusto de autenticación (reemplaza el tuyo) ---
 import streamlit as st
 import streamlit_authenticator as stauth
+import traceback
 
-credentials = st.secrets["credentials"]
-cookie_name = st.secrets["COOKIE_NAME"]
-cookie_key = st.secrets["COOKIE_KEY"]
-cookie_expiry = int(st.secrets["COOKIE_EXPIRY_DAYS"])
+def normalize_credentials_from_secrets():
+    """
+    Devuelve un objeto 'credentials' listo para pasar a stauth.Authenticate.
+    Acepta dos formatos comunes en Streamlit secrets:
+      1) Lista: [[USERS]] -> st.secrets["USERS"]  (lista de dicts con 'username')
+      2) Diccionario: [credentials.usernames.<user>] -> st.secrets["credentials"]
+    """
+    # Intenta obtener la forma recomendada primero
+    creds = st.secrets.get("credentials")
+    if creds:
+        # Si ya viene como credentials con 'usernames', devolverlo tal cual
+        if isinstance(creds, dict) and "usernames" in creds:
+            return creds
+        # Si creds es un dict pero no tiene 'usernames', podría estar en forma [credentials.<user>]
+        # Convertir a { "usernames": { username: {name,email,password} } }
+        if isinstance(creds, dict):
+            usernames = {}
+            for k, v in creds.items():
+                # v debería contener name, email, password
+                if isinstance(v, dict) and "name" in v:
+                    usernames[k] = {
+                        "name": v.get("name"),
+                        "email": v.get("email"),
+                        "password": v.get("password"),
+                    }
+            return {"usernames": usernames}
 
-authenticator = stauth.Authenticate(
-    credentials,
-    cookie_name,
-    cookie_key,
-    cookie_expiry
-)
+    # Si no hay 'credentials', revisa si vienen como lista [[USERS]]
+    users_list = st.secrets.get("USERS")
+    if users_list and isinstance(users_list, list):
+        usernames = {}
+        for u in users_list:
+            # cada 'u' = dict con keys username, name, email, password
+            uname = u.get("username") or u.get("name")
+            if not uname:
+                continue
+            usernames[uname] = {
+                "name": u.get("name"),
+                "email": u.get("email"),
+                "password": u.get("password"),
+            }
+        return {"usernames": usernames}
 
-name, authentication_status, username = authenticator.login(location="sidebar")
-is_admin = username == "admin"
+    # Si llegamos aquí, no encontramos credenciales en un formato conocido
+    return None
+
+# DEBUG seguro: mostrar solo estructura y nombres de usuario (no valores sensibles)
+try:
+    st.write("DEBUG: keys in st.secrets ->", list(st.secrets.keys()))
+    creds_candidate = st.secrets.get("credentials") or st.secrets.get("USERS")
+    st.write("DEBUG: credentials present?:", creds_candidate is not None)
+    if isinstance(creds_candidate, dict):
+        st.write("DEBUG: credentials keys:", list(creds_candidate.keys()))
+    elif isinstance(creds_candidate, list):
+        st.write("DEBUG: USERS list length:", len(creds_candidate))
+        st.write("DEBUG: USERS usernames:", [u.get("username") for u in creds_candidate if isinstance(u, dict)])
+except Exception:
+    st.text("DEBUG read error:\n" + traceback.format_exc())
+
+# Normalizar
+credentials = normalize_credentials_from_secrets()
+if credentials is None:
+    st.error("No se encontraron credenciales válidas en Streamlit Secrets. Revisa el formato (usa 'credentials' con 'usernames' o 'USERS' lista).")
+    st.stop()
+
+# muestra sólo los usernames para confirmar
+try:
+    st.write("DEBUG: detected usernames:", list(credentials.get("usernames", {}).keys()))
+except Exception:
+    st.write("DEBUG: unable to list usernames")
+
+# Cargar cookies/expiry
+try:
+    cookie_name = st.secrets["COOKIE_NAME"]
+    cookie_key = st.secrets["COOKIE_KEY"]
+    cookie_expiry = int(st.secrets.get("COOKIE_EXPIRY_DAYS", 30))
+except Exception:
+    st.error("Faltan secrets de cookies (COOKIE_NAME/COOKIE_KEY/COOKIE_EXPIRY_DAYS).")
+    st.stop()
+
+# Instanciar Authenticate con manejo de error para mostrar la traza real
+try:
+    authenticator = stauth.Authenticate(
+        credentials,  # debe tener la estructura {"usernames": {...}}
+        cookie_name,
+        cookie_key,
+        cookie_expiry
+    )
+except Exception as e:
+    st.error("Error al instanciar stauth.Authenticate — muestro traza:")
+    st.text(traceback.format_exc())
+    st.stop()
+
+# Login (capturar excepción para ver la traza completa)
+try:
+    name, authentication_status, username = authenticator.login(location="sidebar")
+except Exception as e:
+    st.error("Error en authenticator.login() — muestro traza completa:")
+    st.text(traceback.format_exc())
+    st.stop()
+
+# identifica admin de forma flexible
+is_admin = False
+if username:
+    is_admin = (username == "admin") or (username == st.secrets.get("ADMIN_USER"))
+
+# --- fin del bloque ---
+
 
 df_no = obtener_clientes(contactado=False, username=username, is_admin=is_admin)
 
