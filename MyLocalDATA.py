@@ -24,11 +24,17 @@ username = None
 import streamlit as st
 import streamlit_authenticator as stauth
 
+# Cargar usuarios directamente desde secrets
+users = st.secrets["USERS"]  # Esto ya devuelve lista de dicts
+cookie_name = st.secrets["COOKIE_NAME"]
+cookie_key = st.secrets["COOKIE_KEY"]
+cookie_expiry = int(st.secrets["COOKIE_EXPIRY_DAYS"])
+
 authenticator = stauth.Authenticate(
-    st.secrets["credentials"],   # ya contiene 'usernames'
-    st.secrets["cookie_name"],
-    st.secrets["cookie_key"],
-    int(st.secrets["cookie_expiry_days"])
+    users,
+    cookie_name,
+    cookie_key,
+    cookie_expiry
 )
 
 name, authentication_status, username = authenticator.login(location="sidebar")
