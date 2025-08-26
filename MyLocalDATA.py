@@ -111,14 +111,24 @@ except Exception:
 
 # Login (capturamos excepciones)
 try:
-    name, authentication_status, username = authenticator.login(location="sidebar")
-    st.write("DEBUG: login() OK ->", {"name": name, "authentication_status": authentication_status, "username": username})
+    login_result = authenticator.login(location="sidebar")
+    if login_result is None:
+        name, authentication_status, username = None, None, None
+        st.write("DEBUG: login() devolvió None (no hay interacción aún)")
+    else:
+        name, authentication_status, username = login_result
+        st.write("DEBUG: login() OK ->", {
+            "name": name,
+            "authentication_status": authentication_status,
+            "username": username
+        })
 except Exception:
     st.error("Error ejecutando authenticator.login(); muestro traza:")
     st.text(traceback.format_exc())
     st.stop()
 
-is_admin = username == "admin"
+is_admin = (username == "admin") if username else False
+
 # ------------------ fin bloque ------------------
 
 # --------------------------
