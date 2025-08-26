@@ -21,26 +21,18 @@ authentication_status = None
 username = None
 
 # 2) Cargar configuración de autenticación
-import json
 import streamlit as st
 import streamlit_authenticator as stauth
 
-# Cargar usuarios desde secretos de Streamlit
-users_json = st.secrets["USERS"]  # Streamlit Secrets
-users = json.loads(users_json)
-
 authenticator = stauth.Authenticate(
-    users,
-    st.secrets["COOKIE_NAME"],
-    st.secrets["COOKIE_KEY"],
-    expiry_days = int(st.secrets.get("COOKIE_EXPIRY_DAYS", 30))
+    st.secrets["credentials"],   # ya contiene 'usernames'
+    st.secrets["cookie_name"],
+    st.secrets["cookie_key"],
+    int(st.secrets["cookie_expiry_days"])
 )
 
-
-# 4) Llamar a login() pasando sólo location
 name, authentication_status, username = authenticator.login(location="sidebar")
-# Mejor usar un rol definido en los secretos
-is_admin = users[username].get("role") == "admin"
+is_admin = username == "admin"
 
 
 df_no = obtener_clientes(contactado=False, username=username, is_admin=is_admin)
