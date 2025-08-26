@@ -77,7 +77,7 @@ except Exception:
     st.stop()
 
 try:
-    authenticator = stauth.Authenticate(credentials, cookie_name, cookie_key, cookie_expiry, auto_hash=False)
+    authenticator = stauth.Authenticate(credentials, cookie_name, cookie_key, cookie_expiry)
 except Exception as e:
     st.error(f"Error creando stauth.Authenticate: {e}")
     st.stop()
