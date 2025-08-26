@@ -85,7 +85,17 @@ except Exception as e:
     st.error(f"Error creando stauth.Authenticate: {e}")
     st.stop()
 
-name, authentication_status, username = authenticator.login(location="sidebar")
+# Manejo correcto del retorno del login
+try:
+    login_result = authenticator.login(location="sidebar")
+    
+    if login_result is None:
+        name, authentication_status, username = None, None, None
+    else:
+        name, authentication_status, username = login_result
+except Exception as e:
+    st.sidebar.error(f"Error en el proceso de autenticación: {str(e)}")
+    name, authentication_status, username = None, None, None
 
 is_admin = (username == "admin") if username else False
 
