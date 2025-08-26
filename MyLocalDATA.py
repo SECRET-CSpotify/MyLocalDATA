@@ -13,72 +13,41 @@ from db import crear_tabla, agregar_cliente, obtener_clientes, actualizar_client
 st.set_page_config(page_title="Gestor de Clientes", layout="wide")
 
 # --------------------------
-# Autenticación
-# --------------------------
-# 1) Inicializar variables
-name = None
-authentication_status = None
-username = None
-
-# --- BLOQUE DE DIAGNÓSTICO: pega esto en lugar del bloque de autenticación ---
+# ------------------ Bloque de autenticación robusto (pegar aquí) ------------------
 import streamlit as st
 import streamlit_authenticator as stauth
-import inspect, traceback
+import traceback
+from collections.abc import Mapping
 
-st.markdown("## DEBUG - diagnóstico de autenticación (temporal)")
-
-# 1) versión y firmas
-try:
-    st.write("stauth version:", getattr(stauth, "__version__", "unknown"))
-except Exception:
-    st.write("No pude obtener stauth.__version__")
-
-try:
-    st.write("Authenticate.__init__ signature:", inspect.signature(stauth.Authenticate.__init__))
-    # la función login es método de instancia, inspeccionamos la función en la clase
-    st.write("Authenticate.login signature:", inspect.signature(stauth.Authenticate.login))
-except Exception:
-    st.write("No pude inspeccionar firmas de Authenticate.")
-    st.text(traceback.format_exc())
-
-# 2) mostrar keys en secrets y una vista segura de la estructura
-try:
-    st.write("Keys en st.secrets:", list(st.secrets.keys()))
-    # Muestra si existe 'credentials' o 'USERS' y qué forma tienen (sin mostrar passwords)
-    if "credentials" in st.secrets:
-        creds = st.secrets["credentials"]
-        st.write("Tipo de 'credentials':", type(creds).__name__)
-        if isinstance(creds, dict):
-            # si tiene 'usernames' mostramos solo los nombres
-            if "usernames" in creds and isinstance(creds["usernames"], dict):
-                st.write("usernames detectados en credentials:", list(creds["usernames"].keys()))
-            else:
-                st.write("keys en credentials (primer nivel):", list(creds.keys()))
-    if "USERS" in st.secrets:
-        users = st.secrets["USERS"]
-        st.write("Tipo de 'USERS':", type(users).__name__)
-        if isinstance(users, list):
-            st.write("Longitud USERS:", len(users))
-            try:
-                st.write("Usernames list (USERS):", [u.get("username") for u in users if isinstance(u, dict)])
-            except Exception:
-                st.write("No pude listar usernames en USERS.")
-except Exception:
-    st.text("Error leyendo secrets:\n" + traceback.format_exc())
-
-# 3) Normalizar credenciales (igual que antes) y probar instanciación + login con captura de errores
 def normalize_credentials_from_secrets():
+    """
+    Devuelve un objeto {'usernames': {...}} listo para pasar a stauth.Authenticate.
+    Acepta:
+      - st.secrets['credentials'] en forma de mapping (AttrDict/dict) con 'usernames' o con usuarios como subkeys.
+      - st.secrets['USERS'] como lista de dicts con clave 'username'.
+    """
     creds = st.secrets.get("credentials")
+    # 1) Si existe 'credentials'
     if creds:
-        if isinstance(creds, dict) and "usernames" in creds:
-            return creds
-        if isinstance(creds, dict):
+        # Si es Mapping (incluye AttrDict), convertir a dict para manejo seguro
+        if isinstance(creds, Mapping):
+            # caso ideal: ya viene con key "usernames"
+            if "usernames" in creds and isinstance(creds["usernames"], Mapping):
+                # ya está en la forma correcta
+                return {"usernames": dict(creds["usernames"])}
+            # si no tiene 'usernames', interpretamos que creds tiene usuario como keys
             usernames = {}
-            for k, v in creds.items():
-                if isinstance(v, dict) and "name" in v:
-                    usernames[k] = {"name": v.get("name"), "email": v.get("email"), "password": v.get("password")}
-            return {"usernames": usernames}
-
+            for k, v in dict(creds).items():
+                # v puede ser AttrDict o dict-like
+                if isinstance(v, Mapping) and ("name" in v or "email" in v or "password" in v):
+                    usernames[k] = {
+                        "name": v.get("name"),
+                        "email": v.get("email"),
+                        "password": v.get("password")
+                    }
+            if usernames:
+                return {"usernames": usernames}
+    # 2) Si no, revisar lista USERS (forma [[USERS]] en secrets)
     users_list = st.secrets.get("USERS")
     if users_list and isinstance(users_list, list):
         usernames = {}
@@ -88,25 +57,37 @@ def normalize_credentials_from_secrets():
             uname = u.get("username") or u.get("name")
             if not uname:
                 continue
-            usernames[uname] = {"name": u.get("name"), "email": u.get("email"), "password": u.get("password")}
-        return {"usernames": usernames}
-
+            usernames[uname] = {
+                "name": u.get("name"),
+                "email": u.get("email"),
+                "password": u.get("password"),
+            }
+        if usernames:
+            return {"usernames": usernames}
+    # nada válido
     return None
+
+# --- debug seguro (muestra estructura, no contraseñas) ---
+st.write("DEBUG: keys en st.secrets ->", list(st.secrets.keys()))
+try:
+    c = st.secrets.get("credentials")
+    st.write("DEBUG: tipo de credentials ->", type(c).__name__)
+    if isinstance(c, Mapping):
+        st.write("DEBUG: keys top-level de credentials ->", list(dict(c).keys()))
+except Exception:
+    st.text("DEBUG lectura credentials:\n" + traceback.format_exc())
 
 credentials = normalize_credentials_from_secrets()
 if credentials is None:
-    st.error("No se detectaron credenciales válidas en st.secrets ('credentials' o 'USERS').")
+    st.error("No se detectaron credenciales válidas en st.secrets. Asegúrate del formato (ver ejemplo).")
     st.stop()
 
-st.write("DEBUG: credenciales normalizadas - usernames:", list(credentials.get("usernames", {}).keys()))
+st.write("DEBUG: usernames detectados ->", list(credentials.get("usernames", {}).keys()))
 
-# Cargar cookies/expiry (validar existencia)
-missing = []
-for key in ("COOKIE_NAME", "COOKIE_KEY", "COOKIE_EXPIRY_DAYS"):
-    if key not in st.secrets:
-        missing.append(key)
+# Validar cookies
+missing = [k for k in ("COOKIE_NAME", "COOKIE_KEY", "COOKIE_EXPIRY_DAYS") if k not in st.secrets]
 if missing:
-    st.error("Faltan estas keys en st.secrets: " + ", ".join(missing))
+    st.error("Faltan keys en secrets: " + ", ".join(missing))
     st.stop()
 
 cookie_name = st.secrets["COOKIE_NAME"]
@@ -114,34 +95,34 @@ cookie_key = st.secrets["COOKIE_KEY"]
 try:
     cookie_expiry = int(st.secrets["COOKIE_EXPIRY_DAYS"])
 except Exception:
-    st.error("COOKIE_EXPIRY_DAYS no es un entero válido.")
+    st.error("COOKIE_EXPIRY_DAYS debe ser un número entero.")
     st.stop()
 
-# Intentar crear authenticator y llamar login con captura de excepciones
+# Instanciar Authenticate (capturar errores)
 try:
-    authenticator = stauth.Authenticate(credentials, cookie_name, cookie_key, cookie_expiry)
-    st.write("Authenticator creado OK.")
+    authenticator = stauth.Authenticate(
+        credentials,
+        cookie_name,
+        cookie_key,
+        cookie_expiry
+    )
+    st.write("DEBUG: authenticator instanciado OK")
 except Exception:
-    st.error("Error al crear authenticator — traza completa abajo:")
+    st.error("Error creando stauth.Authenticate; muestro traza:")
     st.text(traceback.format_exc())
     st.stop()
 
+# Login (capturamos excepciones)
 try:
-    # Llamada a login envuelta para capturar cualquier TypeError u otro
     name, authentication_status, username = authenticator.login(location="sidebar")
-    st.write("login() devolvió:", {"name": name, "authentication_status": authentication_status, "username": username})
+    st.write("DEBUG: login() OK ->", {"name": name, "authentication_status": authentication_status, "username": username})
 except Exception:
-    st.error("Error al ejecutar authenticator.login() — traza completa abajo:")
+    st.error("Error ejecutando authenticator.login(); muestro traza:")
     st.text(traceback.format_exc())
     st.stop()
 
-# indica admin (solo como info)
 is_admin = username == "admin"
-st.write("is_admin (username == 'admin') =>", is_admin)
-# --- fin del bloque de diagnóstico ---
-
-df_no = obtener_clientes(contactado=False, username=username, is_admin=is_admin)
-
+# ------------------ fin bloque ------------------
 
 # --------------------------
 # Control de acceso
