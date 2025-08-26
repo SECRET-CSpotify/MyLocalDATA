@@ -25,7 +25,7 @@ import streamlit as st
 import streamlit_authenticator as stauth
 
 # Cargar usuarios directamente desde secrets
-users = st.secrets["USERS"]  # Esto ya devuelve lista de dicts
+users = st.secrets["USERS"]  # lista de dicts
 cookie_name = st.secrets["COOKIE_NAME"]
 cookie_key = st.secrets["COOKIE_KEY"]
 cookie_expiry = int(st.secrets["COOKIE_EXPIRY_DAYS"])
