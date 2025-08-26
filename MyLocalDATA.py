@@ -134,13 +134,10 @@ is_admin = (username == "admin") if username else False
 # --------------------------
 # Control de acceso
 # --------------------------
-if authentication_status:
+if authentication_status is True:
 
     st.sidebar.success(f"Bienvenido, {name} 👋")
     authenticator.logout("Cerrar sesión", "sidebar")
-
-    if authentication_status is True:
-    st.success(f"Bienvenido {name} 👋")
     st.write("DEBUG: usuario autenticado con éxito")
 
     # --------------------------
