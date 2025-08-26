@@ -139,6 +139,10 @@ if authentication_status:
     st.sidebar.success(f"Bienvenido, {name} 👋")
     authenticator.logout("Cerrar sesión", "sidebar")
 
+    if authentication_status is True:
+    st.success(f"Bienvenido {name} 👋")
+    st.write("DEBUG: usuario autenticado con éxito")
+
     # --------------------------
     # Estilos personalizados
     # --------------------------
