@@ -101,10 +101,11 @@ except Exception:
 # Instanciar Authenticate (capturar errores)
 try:
     authenticator = stauth.Authenticate(
-        credentials,
+        users,
         cookie_name,
         cookie_key,
-        cookie_expiry
+        cookie_expiry,
+        auto_hash=False  # <- importante: nuestras contraseñas ya están hasheadas
     )
     st.write("DEBUG: authenticator instanciado OK")
 except Exception:
