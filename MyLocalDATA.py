@@ -86,16 +86,14 @@ except Exception as e:
     st.stop()
 
 # Manejo correcto del retorno del login
-try:
-    login_result = authenticator.login(location="sidebar")
-    
-    if login_result is None:
-        name, authentication_status, username = None, None, None
-    else:
-        name, authentication_status, username = login_result
-except Exception as e:
-    st.sidebar.error(f"Error en el proceso de autenticación: {str(e)}")
+login_result = authenticator.login(location="sidebar")
+
+if login_result is None:
+    # No hay interacción aún
     name, authentication_status, username = None, None, None
+else:
+    # Hay resultado del login
+    name, authentication_status, username = login_result
 
 is_admin = (username == "admin") if username else False
 
