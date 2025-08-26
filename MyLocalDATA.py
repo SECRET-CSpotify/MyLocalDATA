@@ -100,13 +100,9 @@ except Exception:
 
 # Instanciar Authenticate (capturar errores)
 try:
-    authenticator = stauth.Authenticate(
-        users,
-        cookie_name,
-        cookie_key,
-        cookie_expiry,
-        auto_hash=False  # <- importante: nuestras contraseñas ya están hasheadas
-    )
+    users = credentials
+    authenticator = stauth.Authenticate(users, cookie_name, cookie_key, cookie_expiry, auto_hash=False)
+
     st.write("DEBUG: authenticator instanciado OK")
 except Exception:
     st.error("Error creando stauth.Authenticate; muestro traza:")
