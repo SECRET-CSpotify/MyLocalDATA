@@ -13,11 +13,6 @@ def normalize_credentials_from_secrets():
         creds_dict = creds.to_dict()   # 👈 convierte a dict de Python
         return {"usernames": creds_dict["usernames"]}
     return None
-
-credentials = normalize_credentials_from_secrets()
-if credentials is None:
-    st.error("No se detectaron credenciales válidas en st.secrets.")
-    st.stop()
     
 # --------------------------
 # Configuración general
@@ -68,11 +63,16 @@ def normalize_credentials_from_secrets():
             return {"usernames": usernames}
     return None
 
+import copy
+
 credentials = normalize_credentials_from_secrets()
 if credentials is None:
-    st.error("No se detectaron credenciales válidas en st.secrets." \
-    "Asegúrate del formato (ver ejemplo).")
+    st.error("No se detectaron credenciales válidas en st.secrets.")
     st.stop()
+
+
+# Hacemos una copia profunda para evitar modificar st.secrets
+credentials = copy.deepcopy(credentials)
 
 # Validar cookies
 missing = [k for k in ("COOKIE_NAME", "COOKIE_KEY", "COOKIE_EXPIRY_DAYS") if k not in st.secrets]
