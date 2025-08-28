@@ -70,9 +70,9 @@ if credentials is None:
     st.error("No se detectaron credenciales válidas en st.secrets.")
     st.stop()
 
+# Convertir a un dict normal (para que sea mutable)
+credentials = dict(credentials)
 
-# Hacemos una copia profunda para evitar modificar st.secrets
-credentials = copy.deepcopy(credentials)
 
 # Validar cookies
 missing = [k for k in ("COOKIE_NAME", "COOKIE_KEY", "COOKIE_EXPIRY_DAYS") if k not in st.secrets]
