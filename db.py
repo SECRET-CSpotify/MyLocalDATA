@@ -3,11 +3,11 @@ import os
 from sqlalchemy import create_engine, text
 import pandas as pd
 
-DB_USER = os.getenv("DB_USER")
-DB_PASS = os.getenv("DB_PASS")
-DB_HOST = os.getenv("DB_HOST")
-DB_NAME = os.getenv("DB_NAME")
-DB_PORT = os.getenv("DB_PORT")
+DB_USER = st.secrets["DB_USER"]
+DB_PASS = st.secrets["DB_PASS"]
+DB_HOST = st.secrets["DB_HOST"]
+DB_NAME = st.secrets["DB_NAME"]
+DB_PORT = st.secrets["DB_PORT"]
 
 # Crear motor de conexión
 engine = create_engine(
