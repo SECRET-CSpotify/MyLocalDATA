@@ -2,11 +2,6 @@
 import streamlit as st   # <-- este faltaba
 import os
 import pandas as pd
-import logging
-logging.basicConfig(level=logging.INFO)
-logging.info("SQL: %s", sql)
-logging.info("Params: %s", params)
-
 from sqlalchemy import create_engine, text
 
 DB_USER = st.secrets["DB_USER"]
