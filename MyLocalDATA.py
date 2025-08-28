@@ -17,9 +17,9 @@ credentials = to_dict(st.secrets["credentials"])
 
 authenticator = stauth.Authenticate(
     credentials,
-    st.secrets["cookie"]["name"],
-    st.secrets["cookie"]["key"],
-    st.secrets["cookie"]["expiry_days"],
+    st.secrets["COOKIE_NAME"],
+    st.secrets["COOKIE_KEY"],
+    st.secrets["COOKIE_EXPIRY_DAYS"],
 )
 
 # --------------------------
