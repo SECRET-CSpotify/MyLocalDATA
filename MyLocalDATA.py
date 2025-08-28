@@ -84,7 +84,7 @@ except Exception as e:
 
 # Manejo correcto del retorno del login
 
-authenticator.login("Login", "sidebar")
+authenticator.login(form_name="Login", location="sidebar")
 
 if st.session_state.get("authentication_status") is True:
     name = st.session_state["name"]
