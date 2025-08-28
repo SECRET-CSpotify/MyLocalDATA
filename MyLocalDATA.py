@@ -13,8 +13,12 @@ def to_dict(obj):
         return {k: to_dict(v) for k, v in obj.items()}
     return obj
 
-credentials = to_dict(st.secrets["credentials"])
+# --- Hacer copia en dict normal ---
+credentials = {
+    "usernames": dict(st.secrets["credentials"]["usernames"])
+}
 
+# --- Crear autenticador ---
 authenticator = stauth.Authenticate(
     credentials,
     st.secrets["COOKIE_NAME"],
