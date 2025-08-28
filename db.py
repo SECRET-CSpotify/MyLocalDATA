@@ -71,7 +71,7 @@ def actualizar_cliente_detalle(cliente_id, datos):
     with engine.begin() as conn:
         conn.execute(text("""
             UPDATE clientes
-            SET tipo_operacion=:tipo_op,
+            SET tipo_operacion=:tipo_operacion,
                 modalidad=:modalidad,
                 origen=:origen,
                 destino=:destino,
