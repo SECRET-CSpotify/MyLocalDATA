@@ -92,14 +92,7 @@ if st.session_state.get("authentication_status") is True:
     is_admin = (username == "admin")
 
     st.sidebar.success(f"Bienvenido, {name} 👋")
-    authenticator.logout("Cerrar sesión", "sidebar")
-
-# --------------------------
-# Control de acceso
-# --------------------------
-if st.session_state.get("authentication_status") is True:
-    st.sidebar.success(f"Bienvenido, {name} 👋")
-    authenticator.logout("Cerrar sesión", "sidebar")
+    authenticator.logout("Cerrar sesión", "sidebar", key="logout_button")
 
     # --------------------------
     # Estilos personalizados
