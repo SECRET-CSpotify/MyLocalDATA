@@ -83,16 +83,15 @@ except Exception as e:
     st.stop()
 
 # Manejo correcto del retorno del login
-login_result = authenticator.login(location="sidebar")
 
-if login_result is None:
-    # No hay interacción aún
-    name, authentication_status, username = None, None, None
-else:
-    # Hay resultado del login
-    name, authentication_status, username = login_result
+authenticator.login("Login", "sidebar")
 
-is_admin = (username == "admin") if username else False
+if st.session_state.get("authentication_status"):
+    name = st.session_state["name"]
+    username = st.session_state["username"]
+    is_admin = (username == "admin")
+    st.sidebar.success(f"Bienvenido, {name} 👋")
+    authenticator.logout("Cerrar sesión", "sidebar")
 
 # --------------------------
 # Control de acceso
@@ -244,8 +243,7 @@ if authentication_status is True:
                 )
                 st.success("✅ Información detallada actualizada")
 
-elif authentication_status is False:
+elif st.session_state.get("authentication_status") is False:
     st.sidebar.error("❌ Usuario o contraseña incorrectos")
-
-else:  # authentication_status is None
+else:
     st.sidebar.warning("🔑 Por favor ingresa tus credenciales")
