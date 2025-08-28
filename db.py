@@ -2,6 +2,11 @@
 import streamlit as st   # <-- este faltaba
 import os
 import pandas as pd
+import logging
+logging.basicConfig(level=logging.INFO)
+logging.info("SQL: %s", sql)
+logging.info("Params: %s", params)
+
 from sqlalchemy import create_engine, text
 
 DB_USER = st.secrets["DB_USER"]
@@ -66,7 +71,7 @@ def obtener_clientes(contactado=None, username=None, is_admin=False):
         params["username"] = username
     if clauses:
         sql += " WHERE " + " AND ".join(clauses)
-    return pd.read_sql(sql, engine, params=params)
+    return pd.read_sql(text(sql), engine, params=params)
 
 def actualizar_cliente_detalle(cliente_id, datos):
     with engine.begin() as conn:
