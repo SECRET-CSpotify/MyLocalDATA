@@ -12,17 +12,6 @@ credentials = {
     "usernames": dict(st.secrets["credentials"]["usernames"])
 }
 
-# --- Inicializar authenticator SOLO una vez ---
-if "authenticator" not in st.session_state:
-    st.session_state.authenticator = stauth.Authenticate(
-        credentials,
-        st.secrets["COOKIE_NAME"],
-        st.secrets["COOKIE_KEY"],
-        st.secrets["COOKIE_EXPIRY_DAYS"],
-        hashed_passwords=True,   # ⚡ si tus contraseñas son bcrypt
-    )
-
-authenticator = st.session_state.authenticator
 # --------------------------
 # Configuración general
 # --------------------------
