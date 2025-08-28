@@ -12,8 +12,7 @@ DB_PORT = st.secrets["DB_PORT"]
 
 # Crear motor de conexión
 engine = create_engine(
-    f"postgresql+psycopg2://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}",
-    connect_args={"sslmode": "require"}
+    f"postgresql+psycopg2://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}?sslmode=require"
 )
 
 # --------------------------
