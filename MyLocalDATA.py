@@ -7,6 +7,18 @@ from yaml.loader import SafeLoader
 import streamlit_authenticator as stauth
 from db import crear_tabla, agregar_cliente, obtener_clientes, actualizar_cliente_detalle
 
+import copy
+
+# Hacer copia mutable del diccionario de credenciales
+credentials = copy.deepcopy(st.secrets["credentials"])
+
+authenticator = stauth.Authenticate(
+    credentials,
+    st.secrets["cookie"]["name"],
+    st.secrets["cookie"]["key"],
+    st.secrets["cookie"]["expiry_days"],
+)
+
 # --------------------------
 # Configuración general
 # --------------------------
