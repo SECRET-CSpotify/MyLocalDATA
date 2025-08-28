@@ -7,11 +7,11 @@ from yaml.loader import SafeLoader
 import streamlit_authenticator as stauth
 from db import crear_tabla, agregar_cliente, obtener_clientes, actualizar_cliente_detalle
 
-import copy
 def normalize_credentials_from_secrets():
     creds = st.secrets.get("credentials")
     if creds:
-        return {"usernames": copy.deepcopy(dict(creds["usernames"]))}
+        creds_dict = creds.to_dict()   # 👈 convierte a dict de Python
+        return {"usernames": creds_dict["usernames"]}
     return None
 
 credentials = normalize_credentials_from_secrets()
