@@ -86,10 +86,11 @@ except Exception as e:
 
 authenticator.login("Login", "sidebar")
 
-if st.session_state.get("authentication_status"):
+if st.session_state.get("authentication_status") is True:
     name = st.session_state["name"]
     username = st.session_state["username"]
     is_admin = (username == "admin")
+
     st.sidebar.success(f"Bienvenido, {name} 👋")
     authenticator.logout("Cerrar sesión", "sidebar")
 
@@ -245,5 +246,6 @@ if authentication_status is True:
 
 elif st.session_state.get("authentication_status") is False:
     st.sidebar.error("❌ Usuario o contraseña incorrectos")
-else:
+
+else:  # authentication_status es None
     st.sidebar.warning("🔑 Por favor ingresa tus credenciales")
