@@ -7,19 +7,22 @@ from yaml.loader import SafeLoader
 import streamlit_authenticator as stauth
 from db import crear_tabla, agregar_cliente, obtener_clientes, actualizar_cliente_detalle
 
-# --- Hacer copia en dict normal ---
+# --- Cargar credenciales desde secrets ---
 credentials = {
     "usernames": dict(st.secrets["credentials"]["usernames"])
 }
 
-# --- Crear autenticador ---
-authenticator = stauth.Authenticate(
-    credentials,
-    st.secrets["COOKIE_NAME"],
-    st.secrets["COOKIE_KEY"],
-    st.secrets["COOKIE_EXPIRY_DAYS"],
-)
+# --- Inicializar authenticator SOLO una vez ---
+if "authenticator" not in st.session_state:
+    st.session_state.authenticator = stauth.Authenticate(
+        credentials,
+        st.secrets["COOKIE_NAME"],
+        st.secrets["COOKIE_KEY"],
+        st.secrets["COOKIE_EXPIRY_DAYS"],
+        hashed_passwords=True,   # ⚡ si tus contraseñas son bcrypt
+    )
 
+authenticator = st.session_state.authenticator
 # --------------------------
 # Configuración general
 # --------------------------
