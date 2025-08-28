@@ -89,10 +89,16 @@ except Exception:
     st.stop()
 
 try:
-    authenticator = stauth.Authenticate(credentials, cookie_name, cookie_key, cookie_expiry)
+    authenticator = stauth.Authenticate(
+        credentials,     # ahora es un dict 100% mutable
+        cookie_name,
+        cookie_key,
+        cookie_expiry
+    )
 except Exception as e:
     st.error(f"Error creando stauth.Authenticate: {e}")
     st.stop()
+
 
 # Manejo correcto del retorno del login
 
