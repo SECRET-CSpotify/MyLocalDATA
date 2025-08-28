@@ -7,10 +7,13 @@ from yaml.loader import SafeLoader
 import streamlit_authenticator as stauth
 from db import crear_tabla, agregar_cliente, obtener_clientes, actualizar_cliente_detalle
 
-import copy
+def to_dict(obj):
+    """Convierte st.secrets (Secrets) en un dict anidado normal."""
+    if isinstance(obj, dict):
+        return {k: to_dict(v) for k, v in obj.items()}
+    return obj
 
-# Hacer copia mutable del diccionario de credenciales
-credentials = copy.deepcopy(st.secrets["credentials"])
+credentials = to_dict(st.secrets["credentials"])
 
 authenticator = stauth.Authenticate(
     credentials,
