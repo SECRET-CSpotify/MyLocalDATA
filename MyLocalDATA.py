@@ -97,7 +97,7 @@ if st.session_state.get("authentication_status") is True:
 # --------------------------
 # Control de acceso
 # --------------------------
-if authentication_status is True:
+if st.session_state.get("authentication_status") is True:
     st.sidebar.success(f"Bienvenido, {name} 👋")
     authenticator.logout("Cerrar sesión", "sidebar")
 
