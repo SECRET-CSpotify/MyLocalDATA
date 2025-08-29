@@ -250,7 +250,7 @@ if st.session_state.get("authentication_status") is True:
             with col2:
                 telefono = st.text_input("Teléfono")
                 email = st.text_input("Email")
-                ciudad = st.text_input("Ciudad")
+                ciudad = st.text_input("Dirección")
             with col3:
                 fecha_contacto = st.date_input("Fecha de Contacto", datetime.today())
                 observacion = st.text_area("Observación")
