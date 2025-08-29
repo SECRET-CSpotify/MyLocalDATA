@@ -59,19 +59,52 @@ def crear_tabla():
 
 def agregar_cliente(datos):
     """
-    datos debe incluir: nombre, nit, contacto, telefono, email, ciudad,
-    fecha_contacto (YYYY-MM-DD), observacion, contactado (bool), username, base_name
+    Inserta un cliente en la tabla 'clientes' pero con validaciones:
+    - asegura que fecha_contacto sea None o 'YYYY-MM-DD' (sin ::date en SQL)
+    - asegura base_name con valor por defecto 'TRANSLOGISTIC' si no viene
+    - captura y muestra errores claros
     """
-    with engine.begin() as conn:
-        conn.execute(text("""
-            INSERT INTO clientes (
-                nombre, nit, contacto, telefono, email, ciudad,
-                fecha_contacto, observacion, contactado, username, base_name
-            ) VALUES (
-                :nombre, :nit, :contacto, :telefono, :email, :ciudad,
-                :fecha_contacto::date, :observacion, :contactado, :username, :base_name
-            )
-        """), datos)
+    import streamlit as st  # db.py ya lo importaba antes, asegurarse
+    datos2 = dict(datos or {})
+
+    # Defaults y saneamiento
+    datos2.setdefault("contactado", False)
+    datos2.setdefault("base_name", "TRANSLOGISTIC")
+    # Fecha: aceptar date object, string o None
+    fc = datos2.get("fecha_contacto")
+    if fc in (None, "", "None"):
+        datos2["fecha_contacto"] = None
+    else:
+        # si es date/datetime, convertir a ISO YYYY-MM-DD
+        try:
+            if hasattr(fc, "isoformat"):
+                datos2["fecha_contacto"] = fc.isoformat()
+            else:
+                # forzar str (esperamos 'YYYY-MM-DD' normalmente)
+                datos2["fecha_contacto"] = str(fc)
+        except Exception:
+            datos2["fecha_contacto"] = None
+
+    # Asegurar que llaves esperadas existan (evita KeyError en parámetros)
+    for k in ("nombre","nit","contacto","telefono","email","ciudad","observacion","username","base_name"):
+        datos2.setdefault(k, None)
+
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("""
+                INSERT INTO clientes (
+                    nombre, nit, contacto, telefono, email, ciudad,
+                    fecha_contacto, observacion, contactado, username, base_name
+                ) VALUES (
+                    :nombre, :nit, :contacto, :telefono, :email, :ciudad,
+                    :fecha_contacto, :observacion, :contactado, :username, :base_name
+                )
+            """), datos2)
+    except Exception as e:
+        # Mostrar en logs y re-levantar para que la UI pueda capturarlo
+        # Si quieres que no detenga la app, puedes quitar el 'raise'
+        st.error(f"Error al insertar cliente en la base de datos: {e}")
+        raise
 
 def obtener_clientes(contactado=None, username=None, is_admin=False, base_name=None):
     """
