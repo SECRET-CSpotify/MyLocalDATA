@@ -1,10 +1,10 @@
 streamlit
 pandas
-SQLAlchemy
+sqlalchemy
 psycopg2-binary
 python-dotenv
 streamlit-authenticator
 bcrypt
-XlsxWriter
-PyYAML
-st-aggrid
+xlsxwriter
+pyyaml
+streamlit-aggrid
