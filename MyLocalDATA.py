@@ -274,8 +274,16 @@ if st.session_state.get("authentication_status") is True:
                     "base_name": destino_base
                 }
 
-                agregar_cliente(datos)
-                st.success("✅ Cliente registrado correctamente")
+                import traceback
+
+                try:
+                    agregar_cliente(datos)
+                    st.success("✅ Cliente registrado correctamente")
+                except Exception as e:
+                    # Mostrar error completo para depuración
+                    st.error("❌ Error guardando cliente. Revisa la información y los logs.")
+                    st.text(str(e))
+                    st.text(traceback.format_exc())  # imprimirá la traza completa
 
     # --------------------------
     # Listado y exportación de clientes
