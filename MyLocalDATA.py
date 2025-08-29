@@ -6,6 +6,8 @@ import yaml
 from yaml.loader import SafeLoader
 import streamlit_authenticator as stauth
 from db import crear_tabla, agregar_cliente, obtener_clientes, actualizar_cliente_detalle
+from collections.abc import Mapping
+import traceback
 
 # --------------------------
 # Configuración general
@@ -13,58 +15,17 @@ from db import crear_tabla, agregar_cliente, obtener_clientes, actualizar_client
 st.set_page_config(page_title="Gestor de Clientes", layout="wide")
 
 # --------------------------
-# ------------------ Bloque de autenticación robusto (pegar aquí) ------------------
-import traceback
-
-# Bloque de autenticación (sin debug)
+# Normalizar y validar credentials desde secrets (una sola definición)
 # --------------------------
-from collections.abc import Mapping
-
 def normalize_credentials_from_secrets():
     """
     Devuelve un objeto {'usernames': {...}} listo para pasar a stauth.Authenticate.
-    """
-    creds = st.secrets.get("credentials")
-    if creds and isinstance(creds, Mapping):
-        if "usernames" in creds and isinstance(creds["usernames"], Mapping):
-            return {"usernames": dict(creds["usernames"])}
-        usernames = {}
-        for k, v in dict(creds).items():
-            if isinstance(v, Mapping) and ("name" in v or "email" in v or "password" in v):
-                usernames[k] = {
-                    "name": v.get("name"),
-                    "email": v.get("email"),
-                    "password": v.get("password")
-                }
-        if usernames:
-            return {"usernames": usernames}
-    users_list = st.secrets.get("USERS")
-    if users_list and isinstance(users_list, list):
-        usernames = {}
-        for u in users_list:
-            if not isinstance(u, dict):
-                continue
-            uname = u.get("username") or u.get("name")
-            if not uname:
-                continue
-            usernames[uname] = {
-                "name": u.get("name"),
-                "email": u.get("email"),
-                "password": u.get("password"),
-            }
-        if usernames:
-            return {"usernames": usernames}
-    return None
-
-# Normalizar y validar credentials desde secrets
-def normalize_credentials_from_secrets():
-    """
-    Devuelve un objeto {'usernames': {...}} listo para pasar a stauth.Authenticate.
-    (He dejado tu función original por seguridad; la usamos aquí)
+    Busca 'is_admin' en cada username si existe.
     """
     creds = st.secrets.get("credentials")
     if creds and isinstance(creds, dict):
         if "usernames" in creds and isinstance(creds["usernames"], dict):
+            # ya viene en formato correcto
             return {"usernames": dict(creds["usernames"])}
         usernames = {}
         for k, v in dict(creds).items():
@@ -73,7 +34,6 @@ def normalize_credentials_from_secrets():
                     "name": v.get("name"),
                     "email": v.get("email"),
                     "password": v.get("password"),
-                    # opcional: rol
                     "is_admin": v.get("is_admin", False)
                 }
         if usernames:
@@ -89,7 +49,9 @@ if credentials is None:
     st.error("Formato inválido en st.secrets['credentials']. Debe ser {'usernames':{...}}")
     st.stop()
 
+# --------------------------
 # Validar cookies
+# --------------------------
 missing = [k for k in ("COOKIE_NAME", "COOKIE_KEY", "COOKIE_EXPIRY_DAYS") if k not in st.secrets]
 if missing:
     st.error("Faltan keys en secrets: " + ", ".join(missing))
@@ -103,9 +65,12 @@ except Exception:
     st.error("COOKIE_EXPIRY_DAYS debe ser un número entero.")
     st.stop()
 
+# --------------------------
+# Crear el authenticator
+# --------------------------
 try:
     authenticator = stauth.Authenticate(
-        credentials,     # ahora es un dict 100% mutable
+        credentials,     # dict con 'usernames'
         cookie_name,
         cookie_key,
         cookie_expiry
@@ -114,126 +79,151 @@ except Exception as e:
     st.error(f"Error creando stauth.Authenticate: {e}")
     st.stop()
 
-
-# Manejo correcto del retorno del login
-
+# login (usa session_state internamente)
 authenticator.login(location="sidebar")
 
+# --------------------------
+# Manejo del status de autenticación
+# --------------------------
 if st.session_state.get("authentication_status") is True:
-    name = st.session_state["name"]
-    username = st.session_state["username"]
-    is_admin = (username == "admin")
+    name = st.session_state.get("name")
+    username = st.session_state.get("username")
+    # mejor determinar is_admin desde credentials si existe
+    is_admin = False
+    try:
+        is_admin = credentials.get("usernames", {}).get(username, {}).get("is_admin", False)
+    except Exception:
+        is_admin = (username == "admin")  # fallback antiguo
 
     st.sidebar.success(f"Bienvenido, {name} 👋")
     authenticator.logout("Cerrar sesión", "sidebar", key="logout_button")
 
-# --- Configuración de Base (TRANSLOGISTIC + Base Privada del usuario) ---
-with st.sidebar.expander("Mi Base y Preferencias"):
-    # nombre personalizado de la base privada (no persistente; para persistir recomiendo crear tabla 'users')
-    default_private_name = f"{name}_PRIVADA"
-    private_base_name = st.text_input("Nombre de tu base privada", value=st.session_state.get("private_base_name", default_private_name))
-    # guardar en session_state para recordar durante la sesión
-    st.session_state["private_base_name"] = private_base_name
+    # --------------------------
+    # Sidebar: Bases y filtros (si admin verá opciones adicionales)
+    # --------------------------
+    with st.sidebar.expander("Mi Base y Preferencias"):
+        default_private_name = f"{name}_PRIVADA" if name else f"{username}_PRIVADA"
+        private_base_name = st.text_input("Nombre de tu base privada",
+                                         value=st.session_state.get("private_base_name", default_private_name))
+        st.session_state["private_base_name"] = private_base_name
 
-    # Selección de dónde ver/guardar los registros
-    selected_base_view = st.radio("¿Qué base quieres ver/usar por defecto?", ["TRANSLOGISTIC", private_base_name])
-    st.session_state["selected_base_view"] = selected_base_view
+        selected_base_view = st.radio("¿Qué base quieres ver/usar por defecto?",
+                                     ["TRANSLOGISTIC", private_base_name])
+        st.session_state["selected_base_view"] = selected_base_view
 
-# Si eres admin, permitir filtrado por username o por base
-if is_admin:
-    st.sidebar.markdown("**Panel Admin — filtros**")
-    # lista de bases disponibles (consulta mínima)
-    todas = obtener_clientes()  # ojo: esto devuelve todo; para apps grandes mejor consulta específica
-    bases_disponibles = sorted(todas['base_name'].dropna().unique().tolist()) if not todas.empty else []
-    bases_disponibles = ["TRANSLOGISTIC"] + [b for b in bases_disponibles if b != "TRANSLOGISTIC"]
-    filtrar_base = st.sidebar.selectbox("Filtrar por base (Admin)", options=["Todas"] + bases_disponibles, index=0)
-    filtrar_username = st.sidebar.text_input("Filtrar por username (dejar en blanco = todos)")
-else:
-    filtrar_base = None
-    filtrar_username = None
+    # Admin filters
+    if is_admin:
+        st.sidebar.markdown("**Panel Admin — filtros**")
+        todas = obtener_clientes()  # para listar bases disponibles; si DB grande ajustar
+        bases_disponibles = []
+        if not todas.empty and "base_name" in todas.columns:
+            bases_disponibles = sorted(todas['base_name'].dropna().unique().tolist())
+        bases_disponibles = ["TRANSLOGISTIC"] + [b for b in bases_disponibles if b != "TRANSLOGISTIC"]
+        filtrar_base = st.sidebar.selectbox("Filtrar por base (Admin)", options=["Todas"] + bases_disponibles, index=0)
+        filtrar_username = st.sidebar.text_input("Filtrar por username (dejar en blanco = todos)")
+    else:
+        filtrar_base = None
+        filtrar_username = None
 
     # --------------------------
-    # Estilos personalizados
+    # Estilos personalizados (usa Google Font disponible: Poppins)
     # --------------------------
     page_bg = """
-<style>
-/* --- Fuente: opción A: usar Google Font disponible (recomendada) --- */
-@import url('https://fonts.googleapis.com/css2?family=Faculty+Glyphic&display=swap');
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
 
-:root {
-    --main-font: 'Faculty Glyphic', sans-serif;
-}
+    :root { --main-font: 'Poppins', sans-serif; }
 
-/* Aplicar fuente a todo */
-html, body, [class*="css"], .stMarkdown, .stText, .stDataFrame, table {
-    font-family: var(--main-font) !important;
-}
+    html, body, [class*="css"], .stMarkdown, .stText, .stDataFrame, table {
+        font-family: var(--main-font) !important;
+    }
 
-/* Fondo animado */
-[data-testid="stAppViewContainer"] {
-    background: linear-gradient(-45deg, #23a6d5, #23d5ab, #ff6f61, #6a11cb);
-    background-size: 400% 400%;
-    animation: gradientBG 15s ease infinite;
-    padding: 1rem;
-}
-@keyframes gradientBG {
-    0% {background-position: 0% 50%;}
-    50% {background-position: 100% 50%;}
-    100% {background-position: 0% 50%;}
-}
+    [data-testid="stAppViewContainer"] {
+        background: linear-gradient(-45deg, #23a6d5, #23d5ab, #ff6f61, #6a11cb);
+        background-size: 400% 400%;
+        animation: gradientBG 15s ease infinite;
+        padding: 1rem;
+    }
+    @keyframes gradientBG {
+        0% {background-position: 0% 50%;}
+        50% {background-position: 100% 50%;}
+        100% {background-position: 0% 50%;}
+    }
 
-/* Títulos mejorados */
-h1, h2, h3, h4, h5, h6, .stText {
-    font-weight: 700 !important;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.35);
-    color: white !important;
-}
+    h1, h2, h3, h4, h5, h6, .stText {
+        font-weight: 700 !important;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.35);
+        color: white !important;
+    }
 
-/* Botones con efecto hover */
-.stButton>button {
-    background: linear-gradient(90deg,#6a11cb,#23a6d5);
-    color: white;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 10px;
-    transition: transform .12s ease, box-shadow .12s ease;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-}
-.stButton>button:hover {
-    transform: translateY(-3px) scale(1.01);
-    box-shadow: 0 8px 18px rgba(0,0,0,0.25);
-}
+    .stButton>button {
+        background: linear-gradient(90deg,#6a11cb,#23a6d5);
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 10px;
+        transition: transform .12s ease, box-shadow .12s ease;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    .stButton>button:hover {
+        transform: translateY(-3px) scale(1.01);
+        box-shadow: 0 8px 18px rgba(0,0,0,0.25);
+    }
 
-/* DataFrame: cabeceras en negrita y más naturales */
-[data-testid="stDataFrame"] table thead th {
-    font-weight: 700 !important;
-    text-transform: none !important;
-    background: rgba(0,0,0,0.15) !important;
-    color: white !important;
-}
+    [data-testid="stDataFrame"] table thead th {
+        font-weight: 700 !important;
+        text-transform: none !important;
+        background: rgba(0,0,0,0.15) !important;
+        color: white !important;
+    }
 
-/* Pequeños ajustes para inputs/expander */
-.stExpander {
-    background: rgba(255,255,255,0.06);
-    border-radius: 8px;
-    padding: 6px;
-}
-</style>
-"""
+    .stExpander {
+        background: rgba(255,255,255,0.06);
+        border-radius: 8px;
+        padding: 6px;
+    }
+    </style>
+    """
+    st.markdown(page_bg, unsafe_allow_html=True)
 
     # --------------------------
     # Conexión a BD (crear tabla si no existe)
     # --------------------------
     crear_tabla()
-    
+
     # --------------------------
-    # Función auxiliar: exportar a Excel
+    # Funciones auxiliares locales
     # --------------------------
     def exportar_excel(df: pd.DataFrame) -> bytes:
         output = BytesIO()
         with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
             df.to_excel(writer, index=False, sheet_name="Clientes")
         return output.getvalue()
+
+    def rename_columns_for_display(df):
+        if df.empty:
+            return df
+        rename_map = {
+            "nombre": "Nombre",
+            "nit": "NIT",
+            "contacto": "Persona de Contacto",
+            "telefono": "Teléfono",
+            "email": "Email",
+            "ciudad": "Ciudad",
+            "fecha_contacto": "Última Fecha de Contacto",
+            "observacion": "Observación",
+            "contactado": "Contactado",
+            "username": "Propietario",
+            "base_name": "Base",
+            "tipo_operacion": "Tipo de Operación",
+            "modalidad": "Modalidad",
+            "origen": "Origen",
+            "destino": "Destino",
+            "mercancia": "Mercancía"
+        }
+        df2 = df.copy()
+        df2 = df2.rename(columns={k: v for k, v in rename_map.items() if k in df2.columns})
+        return df2
 
     # --------------------------
     # Encabezado
@@ -248,20 +238,19 @@ h1, h2, h3, h4, h5, h6, .stText {
         with st.form("form_cliente"):
             col1, col2, col3 = st.columns(3)
             with col1:
-                nombre   = st.text_input("Nombre Cliente")
-                nit      = st.text_input("NIT")
+                nombre = st.text_input("Nombre Cliente")
+                nit = st.text_input("NIT")
                 contacto = st.text_input("Persona de Contacto")
             with col2:
                 telefono = st.text_input("Teléfono")
-                email    = st.text_input("Email")
-                ciudad   = st.text_input("Ciudad")
+                email = st.text_input("Email")
+                ciudad = st.text_input("Ciudad")
             with col3:
                 fecha_contacto = st.date_input("Fecha de Contacto", datetime.today())
-                observacion    = st.text_area("Observación")
-                contactado     = st.checkbox("Cliente Contactado")
+                observacion = st.text_area("Observación")
+                contactado = st.checkbox("Cliente Contactado")
 
             if st.form_submit_button("Guardar"):
-                # decidir en qué base guardar: campo del formulario con selección
                 destino_base = st.selectbox("Guardar en Base:", ["TRANSLOGISTIC", st.session_state.get("private_base_name", username)])
                 fecha_iso = fecha_contacto.isoformat()  # YYYY-MM-DD
 
@@ -275,8 +264,8 @@ h1, h2, h3, h4, h5, h6, .stText {
                     "fecha_contacto": fecha_iso,
                     "observacion": observacion,
                     "contactado": contactado,
-                    "username": username,        # propietario del registro
-                    "base_name": destino_base    # TRANSLOGISTIC o la base privada
+                    "username": username,
+                    "base_name": destino_base
                 }
 
                 agregar_cliente(datos)
@@ -288,54 +277,26 @@ h1, h2, h3, h4, h5, h6, .stText {
     tab1, tab2 = st.tabs(["📋 No Contactados", "✅ Contactados"])
 
     with tab1:
-        # calcular filtros según sesión / admin
-selected_base = st.session_state.get("selected_base_view", "TRANSLOGISTIC")
-if is_admin:
-    base_filter = filtrar_base if filtrar_base and filtrar_base != "Todas" else (None if filtrar_username else None)
-    # si admin filtró por base específica y no por username:
-    if filtrar_base and filtrar_base != "Todas":
-        df_no = obtener_clientes(contactado=False, username=None, is_admin=True, base_name=filtrar_base)
-    elif filtrar_username:
-        df_no = obtener_clientes(contactado=False, username=filtrar_username, is_admin=True)
-    else:
-        df_no = obtener_clientes(contactado=False, is_admin=True)
-else:
-    # usuario no admin: mostrar por defecto su base privada o TRANSLOGISTIC, según selección
-    df_no = obtener_clientes(contactado=False, username=username, is_admin=False, base_name=(selected_base if selected_base != "TRANSLOGISTIC" else None))
         st.subheader("Clientes No Contactados")
-        filtro = st.text_input("🔍 Buscar cliente")
-        if filtro:
+        # calcular filtros según sesión / admin
+        selected_base = st.session_state.get("selected_base_view", "TRANSLOGISTIC")
+        if is_admin:
+            if filtrar_base and filtrar_base != "Todas":
+                df_no = obtener_clientes(contactado=False, username=None, is_admin=True, base_name=filtrar_base)
+            elif filtrar_username:
+                df_no = obtener_clientes(contactado=False, username=filtrar_username, is_admin=True)
+            else:
+                df_no = obtener_clientes(contactado=False, is_admin=True)
+        else:
+            # usuario no admin: mostrar por defecto su base privada o TRANSLOGISTIC, según selección
+            base_arg = None if selected_base == "TRANSLOGISTIC" else selected_base
+            df_no = obtener_clientes(contactado=False, username=username, is_admin=False, base_name=base_arg)
+
+        filtro = st.text_input("🔍 Buscar cliente (filtra por Nombre)")
+        if filtro and not df_no.empty and "nombre" in df_no.columns:
             df_no = df_no[df_no["nombre"].str.contains(filtro, case=False, na=False)]
 
-        # Renombrar columnas para UI (más naturales)
-def rename_columns_for_display(df):
-    if df.empty:
-        return df
-    rename_map = {
-        "nombre": "Nombre",
-        "nit": "NIT",
-        "contacto": "Persona de Contacto",
-        "telefono": "Teléfono",
-        "email": "Email",
-        "ciudad": "Ciudad",
-        "fecha_contacto": "Última Fecha de Contacto",
-        "observacion": "Observación",
-        "contactado": "Contactado",
-        "username": "Propietario",
-        "base_name": "Base",
-        "tipo_operacion": "Tipo de Operación",
-        "modalidad": "Modalidad",
-        "origen": "Origen",
-        "destino": "Destino",
-        "mercancia": "Mercancía"
-    }
-    # crear copia para evitar mutar el original
-    df2 = df.copy()
-    df2 = df2.rename(columns={k:v for k,v in rename_map.items() if k in df2.columns})
-    return df2
-
-# ejemplo de uso justo antes de mostrar:
-df_no_display = rename_columns_for_display(df_no)
+        df_no_display = rename_columns_for_display(df_no)
         st.dataframe(df_no_display, use_container_width=True)
         if not df_no.empty:
             st.download_button(
@@ -345,9 +306,21 @@ df_no_display = rename_columns_for_display(df_no)
             )
 
     with tab2:
-        df_si = obtener_clientes(contactado=True, username=username, is_admin=is_admin)
         st.subheader("Clientes Contactados")
-        st.dataframe(df_si, use_container_width=True)
+        # filtros similares para contactados
+        if is_admin:
+            if filtrar_base and filtrar_base != "Todas":
+                df_si = obtener_clientes(contactado=True, username=None, is_admin=True, base_name=filtrar_base)
+            elif filtrar_username:
+                df_si = obtener_clientes(contactado=True, username=filtrar_username, is_admin=True)
+            else:
+                df_si = obtener_clientes(contactado=True, is_admin=True)
+        else:
+            base_arg = None if selected_base == "TRANSLOGISTIC" else selected_base
+            df_si = obtener_clientes(contactado=True, username=username, is_admin=False, base_name=base_arg)
+
+        df_si_display = rename_columns_for_display(df_si)
+        st.dataframe(df_si_display, use_container_width=True)
         if not df_si.empty:
             st.download_button(
                 "⬇️ Exportar a Excel",
@@ -361,28 +334,34 @@ df_no_display = rename_columns_for_display(df_no)
     st.markdown("---")
     st.subheader("🔎 Vista Detallada por Cliente")
 
-    clientes = obtener_clientes(username=username, is_admin=is_admin)
-    if not clientes.empty:
-        seleccion = st.selectbox("Selecciona un cliente", clientes["nombre"])
+    # Obtener clientes para selector (para admin respetar filtros)
+    if is_admin:
+        clientes = obtener_clientes(is_admin=True)
+    else:
+        base_arg = None if st.session_state.get("selected_base_view", "TRANSLOGISTIC") == "TRANSLOGISTIC" else st.session_state.get("selected_base_view")
+        clientes = obtener_clientes(username=username, is_admin=False, base_name=base_arg)
+
+    if clientes is not None and not clientes.empty:
+        seleccion = st.selectbox("Selecciona un cliente", clientes["nombre"].tolist())
         cliente = clientes[clientes["nombre"] == seleccion].iloc[0]
 
         with st.form("detalle_cliente"):
-            st.write(f"### {cliente['nombre']} (NIT: {cliente['nit']})")
+            st.write(f"### {cliente.get('nombre', '')} (NIT: {cliente.get('nit', '')})")
             tipo_operacion = st.text_input("Tipo de Operación", cliente.get("tipo_operacion", ""))
-            modalidad      = st.text_input("Modalidad", cliente.get("modalidad", ""))
-            origen         = st.text_input("Origen", cliente.get("origen", ""))
-            destino        = st.text_input("Destino", cliente.get("destino", ""))
-            mercancia      = st.text_area("Mercancía", cliente.get("mercancia", ""))
+            modalidad = st.text_input("Modalidad", cliente.get("modalidad", ""))
+            origen = st.text_input("Origen", cliente.get("origen", ""))
+            destino = st.text_input("Destino", cliente.get("destino", ""))
+            mercancia = st.text_area("Mercancía", cliente.get("mercancia", ""))
 
             if st.form_submit_button("💾 Guardar cambios"):
                 actualizar_cliente_detalle(
                     cliente["id"],
                     {
                         "tipo_operacion": tipo_operacion,
-                        "modalidad":      modalidad,
-                        "origen":         origen,
-                        "destino":        destino,
-                        "mercancia":      mercancia
+                        "modalidad": modalidad,
+                        "origen": origen,
+                        "destino": destino,
+                        "mercancia": mercancia
                     }
                 )
                 st.success("✅ Información detallada actualizada")
