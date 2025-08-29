@@ -17,40 +17,46 @@ st.set_page_config(page_title="Gestor de Clientes", layout="wide")
 # --------------------------
 # Normalizar y validar credentials desde secrets (una sola definición)
 # --------------------------
-def normalize_credentials_from_secrets():
+# --------------------------
+# Construir una copia MUTABLE de los credentials guardados en secrets
+# --------------------------
+from collections.abc import Mapping
+
+def build_mutable_credentials_from_secrets():
     """
-    Devuelve un objeto {'usernames': {...}} listo para pasar a stauth.Authenticate.
-    Busca 'is_admin' en cada username si existe.
+    Toma st.secrets['credentials'] (Mapping/TOML) y crea un dict Python puro:
+    {'usernames': { 'user1': {'name':..., 'email':..., 'password':..., 'is_admin':...}, ... }}
+    Esto evita que streamlit_authenticator intente escribir sobre st.secrets (inmutable).
     """
-    creds = st.secrets.get("credentials")
-    if creds and isinstance(creds, dict):
-        if "usernames" in creds and isinstance(creds["usernames"], dict):
-            # ya viene en formato correcto
-            return {"usernames": dict(creds["usernames"])}
-        usernames = {}
-        for k, v in dict(creds).items():
-            if isinstance(v, dict) and ("name" in v or "email" in v or "password" in v):
-                usernames[k] = {
-                    "name": v.get("name"),
-                    "email": v.get("email"),
-                    "password": v.get("password"),
-                    "is_admin": v.get("is_admin", False)
-                }
-        if usernames:
-            return {"usernames": usernames}
-    # fallback a formato antiguo
-    try:
-        return {"usernames": st.secrets["credentials"]["usernames"]}
-    except Exception:
+    raw = st.secrets.get("credentials")
+    if not raw:
         return None
 
-credentials = normalize_credentials_from_secrets()
-if credentials is None:
-    st.error("Formato inválido en st.secrets['credentials']. Debe ser {'usernames':{...}}")
+    # si ya viene como {'usernames': {...}} usar esa sección, si no convertir el mapping entero
+    if isinstance(raw, Mapping) and "usernames" in raw and isinstance(raw["usernames"], Mapping):
+        raw_usernames = raw["usernames"]
+    else:
+        raw_usernames = dict(raw)
+
+    mutable_usernames = {}
+    for uname, udata in dict(raw_usernames).items():
+        if isinstance(udata, Mapping):
+            mutable_usernames[uname] = {
+                "name": udata.get("name"),
+                "email": udata.get("email"),
+                "password": udata.get("password"),
+                "is_admin": udata.get("is_admin", False)
+            }
+    return {"usernames": mutable_usernames}
+
+# Crear la copia mutable que pasaremos a streamlit_authenticator
+credentials_for_auth = build_mutable_credentials_from_secrets()
+if credentials_for_auth is None:
+    st.error("Formato inválido en st.secrets['credentials']. Debe contener usuarios.")
     st.stop()
 
 # --------------------------
-# Validar cookies
+# Validar cookies (igual que antes)
 # --------------------------
 missing = [k for k in ("COOKIE_NAME", "COOKIE_KEY", "COOKIE_EXPIRY_DAYS") if k not in st.secrets]
 if missing:
@@ -66,11 +72,11 @@ except Exception:
     st.stop()
 
 # --------------------------
-# Crear el authenticator
+# Crear el authenticator con el dict MUTABLE
 # --------------------------
 try:
     authenticator = stauth.Authenticate(
-        credentials,     # dict con 'usernames'
+        credentials_for_auth,     # <-- PASAR AQUI el dict MUTABLE (no st.secrets)
         cookie_name,
         cookie_key,
         cookie_expiry
