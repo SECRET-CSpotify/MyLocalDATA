@@ -23,11 +23,8 @@ engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 # Funciones auxiliares
 # --------------------------
 def crear_tabla():
-    """
-    Crea la tabla 'clientes' (si no existe) y añade un índice por username/base.
-    Hemos añadido la columna base_name para distinguir TRANSLOGISTIC de las bases privadas.
-    """
     with engine.begin() as conn:
+        # crear tabla si no existe (incluye base_name en caso de nueva tabla)
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS clientes (
                 id SERIAL PRIMARY KEY,
@@ -48,9 +45,17 @@ def crear_tabla():
                 destino TEXT,
                 mercancia TEXT
             );
-            CREATE INDEX IF NOT EXISTS idx_clientes_username ON clientes(username);
-            CREATE INDEX IF NOT EXISTS idx_clientes_base_name ON clientes(base_name);
         """))
+
+        # asegurarse de que, si ya existía la tabla, tenga la columna base_name
+        conn.execute(text("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS base_name TEXT;"))
+
+        # crear índices si no existen
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_clientes_username ON clientes(username);"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_clientes_base_name ON clientes(base_name);"))
+
+        # asignar TRANSLOGISTIC a registros previos que no tienen base_name
+        conn.execute(text("UPDATE clientes SET base_name = 'TRANSLOGISTIC' WHERE base_name IS NULL;"))
 
 def agregar_cliente(datos):
     """
