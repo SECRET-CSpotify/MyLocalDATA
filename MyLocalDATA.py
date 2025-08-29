@@ -130,9 +130,11 @@ if st.session_state.get("authentication_status") is True:
     # --------------------------
     page_bg = """
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
-
-    :root { --main-font: 'Poppins', sans-serif; }
+    @import url('https://fonts.googleapis.com/css2?family=Faculty+Glyphic&display=swap');
+    
+    :root {
+        --main-font: 'Faculty Glyphic', sans-serif;
+    }
 
     html, body, [class*="css"], .stMarkdown, .stText, .stDataFrame, table {
         font-family: var(--main-font) !important;
