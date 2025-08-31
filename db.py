@@ -96,7 +96,6 @@ def agregar_cliente(datos):
     # Defaults y saneamiento
     datos2.setdefault("contactado", False)
     datos2.setdefault("base_name", "TRANSLOGISTIC")
-    datos2.setdefault("direccion", None)
 
     # Si contactado == False, no se guarda fecha_contacto (lógico)
     fc = datos2.get("fecha_contacto")
