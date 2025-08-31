@@ -488,19 +488,24 @@ if st.session_state.get("authentication_status") is True:
     
             # Acciones sobre filas seleccionadas (ejemplo: eliminar)
             selected_no = grid_response.get("selected_rows", [])
-            if selected_no:
+            # Evitar truthiness ambigua de pandas.DataFrame: comprobar explícitamente longitud
+            if selected_no is not None and len(selected_no) > 0:
                 st.markdown(f"**Filas seleccionadas:** {len(selected_no)}")
                 if st.button("🗑️ Eliminar seleccionados (No Contactados)", key="eliminar_no"):
                     st.warning("Confirmar: se eliminarán los clientes seleccionados.")
                     if st.button("Confirmar eliminación seleccionados (No Contactados)", key="confirm_eliminar_no"):
                         try:
                             for row in selected_no:
+                                # Si por alguna razón row viene como pandas.Series o similar, convertir a dict seguro
+                                if hasattr(row, "to_dict"):
+                                    row = row.to_dict()
                                 rid = row.get("id")
                                 if rid:
                                     eliminar_cliente(rid)
                             st.success("Clientes seleccionados eliminados ✅")
                         except Exception as e:
                             st.error(f"No se pudieron eliminar: {e}")
+
     
     # -------------------------
     # TAB 2: CONTACTADOS
@@ -600,13 +605,16 @@ if st.session_state.get("authentication_status") is True:
     
             # Acciones sobre filas seleccionadas (ej: eliminar)
             selected = grid_response2.get("selected_rows", [])
-            if selected:
+            # Comprobación explícita para evitar ValueError si viene un DataFrame
+            if selected is not None and len(selected) > 0:
                 st.markdown(f"**Filas seleccionadas:** {len(selected)}")
                 if st.button("🗑️ Eliminar seleccionados (Contactados)", key="eliminar_si"):
                     st.warning("Confirmar: se eliminarán los clientes seleccionados.")
                     if st.button("Confirmar eliminación seleccionados (Contactados)", key="confirm_eliminar_si"):
                         try:
                             for row in selected:
+                                if hasattr(row, "to_dict"):
+                                    row = row.to_dict()
                                 rid = row.get("id")
                                 if rid:
                                     eliminar_cliente(rid)
