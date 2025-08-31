@@ -445,17 +445,39 @@ if st.session_state.get("authentication_status") is True:
                                     continue
                                 # manejo especial de fecha_contacto y contactado
                                 if db_col == "fecha_contacto":
-                                    # AgGrid puede devolver datetimes o strings; normalizamos a YYYY-MM-DD o None
+                                    # Normalizar a None o 'YYYY-MM-DD' — evitar valores como "{}"
                                     try:
-                                        if new_val in (None, "", "None"):
+                                        # casos claramente "vacíos"
+                                        if new_val in (None, "", "None", "null", "NULL"):
                                             updates_db[db_col] = None
-                                        elif hasattr(new_val, "date"):  # pandas Timestamp
-                                            updates_db[db_col] = str(new_val.date())
+                                        # cadena literal con llaves "{}" que a veces retorna el editor
+                                        elif isinstance(new_val, str) and new_val.strip() in ("{}", "{ }"):
+                                            updates_db[db_col] = None
+                                        # si viene un dict (p.ej. {'date': '2025-08-31'}) intentamos extraer
+                                        elif isinstance(new_val, dict):
+                                            date_candidate = new_val.get("date") or new_val.get("value") or next(iter(new_val.values()), None)
+                                            parsed = pd.to_datetime(date_candidate, errors="coerce")
+                                            if pd.isna(parsed):
+                                                updates_db[db_col] = None
+                                            else:
+                                                updates_db[db_col] = str(parsed.date())
+                                        # pandas Timestamp u objetos con .date()
+                                        elif hasattr(new_val, "date"):
+                                            try:
+                                                updates_db[db_col] = str(new_val.date())
+                                            except Exception:
+                                                updates_db[db_col] = None
                                         else:
-                                            # intentar parsear string o dejar tal cual
-                                            updates_db[db_col] = str(new_val)
+                                            # intentar parsear cualquier string/valor con pandas
+                                            parsed = pd.to_datetime(new_val, errors="coerce")
+                                            if pd.isna(parsed):
+                                                updates_db[db_col] = None
+                                            else:
+                                                updates_db[db_col] = str(parsed.date())
                                     except Exception:
-                                        updates_db[db_col] = str(new_val)
+                                        # en caso de error defensivo no enviamos valor inválido a la DB
+                                        updates_db[db_col] = None
+
                                 elif db_col == "contactado":
                                     # normalizar booleano
                                     if isinstance(new_val, bool):
@@ -568,15 +590,39 @@ if st.session_state.get("authentication_status") is True:
                                 if not db_col:
                                     continue
                                 if db_col == "fecha_contacto":
+                                    # Normalizar a None o 'YYYY-MM-DD' — evitar valores como "{}"
                                     try:
-                                        if new_val in (None, "", "None"):
+                                        # casos claramente "vacíos"
+                                        if new_val in (None, "", "None", "null", "NULL"):
                                             updates_db[db_col] = None
+                                        # cadena literal con llaves "{}" que a veces retorna el editor
+                                        elif isinstance(new_val, str) and new_val.strip() in ("{}", "{ }"):
+                                            updates_db[db_col] = None
+                                        # si viene un dict (p.ej. {'date': '2025-08-31'}) intentamos extraer
+                                        elif isinstance(new_val, dict):
+                                            date_candidate = new_val.get("date") or new_val.get("value") or next(iter(new_val.values()), None)
+                                            parsed = pd.to_datetime(date_candidate, errors="coerce")
+                                            if pd.isna(parsed):
+                                                updates_db[db_col] = None
+                                            else:
+                                                updates_db[db_col] = str(parsed.date())
+                                        # pandas Timestamp u objetos con .date()
                                         elif hasattr(new_val, "date"):
-                                            updates_db[db_col] = str(new_val.date())
+                                            try:
+                                                updates_db[db_col] = str(new_val.date())
+                                            except Exception:
+                                                updates_db[db_col] = None
                                         else:
-                                            updates_db[db_col] = str(new_val)
+                                            # intentar parsear cualquier string/valor con pandas
+                                            parsed = pd.to_datetime(new_val, errors="coerce")
+                                            if pd.isna(parsed):
+                                                updates_db[db_col] = None
+                                            else:
+                                                updates_db[db_col] = str(parsed.date())
                                     except Exception:
-                                        updates_db[db_col] = str(new_val)
+                                        # en caso de error defensivo no enviamos valor inválido a la DB
+                                        updates_db[db_col] = None
+
                                 elif db_col == "contactado":
                                     if isinstance(new_val, bool):
                                         updates_db[db_col] = new_val
