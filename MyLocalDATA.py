@@ -490,10 +490,20 @@ if st.session_state.get("authentication_status") is True:
 
     # Obtener clientes para selector (para admin respetar filtros)
     if is_admin:
-        clientes = obtener_clientes(is_admin=True)
+        # Si el admin puso un filtro de base en la sidebar (filtrar_base), aplica
+        if 'filtrar_base' in locals() and filtrar_base and filtrar_base != "Todas":
+            clientes = obtener_clientes(is_admin=True, base_name=filtrar_base)
+        else:
+            clientes = obtener_clientes(is_admin=True)
     else:
-        base_arg = None if st.session_state.get("selected_base_view", "TRANSLOGISTIC") == "TRANSLOGISTIC" else st.session_state.get("selected_base_view")
-        clientes = obtener_clientes(username=username, is_admin=False, base_name=base_arg)
+        selected = st.session_state.get("selected_base_view", "TRANSLOGISTIC")
+        if selected == "TRANSLOGISTIC":
+            clientes = obtener_clientes(contactado=None, username=None, is_admin=False, base_name="TRANSLOGISTIC")
+        else:
+            # selected es un display name; convertir a internal
+            internal_base = f"{username}__{selected}"
+            clientes = obtener_clientes(username=username, is_admin=False, base_name=internal_base)
+
 
 if clientes is not None and not clientes.empty:
     seleccion = st.selectbox("Selecciona un cliente", clientes["nombre"].tolist())
