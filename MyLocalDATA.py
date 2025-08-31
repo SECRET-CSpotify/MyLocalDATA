@@ -504,44 +504,43 @@ if st.session_state.get("authentication_status") is True:
             internal_base = f"{username}__{selected}"
             clientes = obtener_clientes(username=username, is_admin=False, base_name=internal_base)
 
-
-if clientes is not None and not clientes.empty:
-    seleccion = st.selectbox("Selecciona un cliente", clientes["nombre"].tolist())
-    cliente = clientes[clientes["nombre"] == seleccion].iloc[0]
-
-    with st.form("detalle_cliente"):
-        st.write(f"### {cliente.get('nombre', '')} (NIT: {cliente.get('nit', '')})")
-        tipo_operacion = st.text_input("Tipo de Operación", cliente.get("tipo_operacion", ""))
-        modalidad = st.text_input("Modalidad", cliente.get("modalidad", ""))
-        origen = st.text_input("Origen", cliente.get("origen", ""))
-        destino = st.text_input("Destino", cliente.get("destino", ""))
-        mercancia = st.text_area("Mercancía", cliente.get("mercancia", ""))
-
-        col_a, col_b = st.columns([1,1])
-        with col_a:
-            if st.form_submit_button("💾 Guardar cambios"):
-                actualizar_cliente_detalle(
-                    cliente["id"],
-                    {
-                        "tipo_operacion": tipo_operacion,
-                        "modalidad": modalidad,
-                        "origen": origen,
-                        "destino": destino,
-                        "mercancia": mercancia
-                    }
-                )
-                st.success("✅ Información detallada actualizada")
-
-        with col_b:
-            # Botón eliminar (inicia confirmación)
-            if st.button("🗑️ Eliminar cliente"):
-                st.warning("Estás a punto de eliminar este cliente. Esta acción es irreversible.")
-                if st.button("Confirmar eliminación"):
-                    try:
-                        eliminar_cliente(cliente["id"])
-                        st.success("Cliente eliminado ✅")
-                    except Exception as e:
-                        st.error(f"No se pudo eliminar el cliente: {e}")
+    if clientes is not None and not clientes.empty:
+        seleccion = st.selectbox("Selecciona un cliente", clientes["nombre"].tolist())
+        cliente = clientes[clientes["nombre"] == seleccion].iloc[0]
+    
+        with st.form("detalle_cliente"):
+            st.write(f"### {cliente.get('nombre', '')} (NIT: {cliente.get('nit', '')})")
+            tipo_operacion = st.text_input("Tipo de Operación", cliente.get("tipo_operacion", ""))
+            modalidad = st.text_input("Modalidad", cliente.get("modalidad", ""))
+            origen = st.text_input("Origen", cliente.get("origen", ""))
+            destino = st.text_input("Destino", cliente.get("destino", ""))
+            mercancia = st.text_area("Mercancía", cliente.get("mercancia", ""))
+    
+            col_a, col_b = st.columns([1,1])
+            with col_a:
+                if st.form_submit_button("💾 Guardar cambios"):
+                    actualizar_cliente_detalle(
+                        cliente["id"],
+                        {
+                            "tipo_operacion": tipo_operacion,
+                            "modalidad": modalidad,
+                            "origen": origen,
+                            "destino": destino,
+                            "mercancia": mercancia
+                        }
+                    )
+                    st.success("✅ Información detallada actualizada")
+    
+            with col_b:
+                # Botón eliminar (inicia confirmación)
+                if st.button("🗑️ Eliminar cliente"):
+                    st.warning("Estás a punto de eliminar este cliente. Esta acción es irreversible.")
+                    if st.button("Confirmar eliminación"):
+                        try:
+                            eliminar_cliente(cliente["id"])
+                            st.success("Cliente eliminado ✅")
+                        except Exception as e:
+                            st.error(f"No se pudo eliminar el cliente: {e}")
 
     # -------------------------
     # Historial de contactos
