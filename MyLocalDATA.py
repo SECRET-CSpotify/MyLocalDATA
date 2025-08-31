@@ -408,24 +408,21 @@ if st.session_state.get("authentication_status") is True:
                     gb.configure_column(c, editable=True)
             gb.configure_selection(selection_mode="multiple", use_checkbox=True)
 
+            # Campos de texto editables
+            gb.configure_column("Nombre", editable=True, cellEditor="agTextCellEditor")
+            gb.configure_column("NIT", editable=True, cellEditor="agTextCellEditor")
+            gb.configure_column("Persona de contacto", editable=True, cellEditor="agTextCellEditor")
+            gb.configure_column("Dirección", editable=True, cellEditor="agTextCellEditor")
+            gb.configure_column("Ciudad", editable=True, cellEditor="agTextCellEditor")
+            gb.configure_column("Teléfono", editable=True, cellEditor="agTextCellEditor")
+            gb.configure_column("Email", editable=True, cellEditor="agTextCellEditor")
+            gb.configure_column("Observación", editable=True, cellEditor="agLargeTextCellEditor")
             
-            # Aquí pegas las configuraciones específicas 👇
-            gb.configure_column("nombre", editable=True, cellEditor="agTextCellEditor")
-            gb.configure_column("nit", editable=True, cellEditor="agTextCellEditor")
-            gb.configure_column("persona_contacto", editable=True, cellEditor="agTextCellEditor")
-            gb.configure_column("direccion", editable=True, cellEditor="agTextCellEditor")
-            gb.configure_column("ciudad", editable=True, cellEditor="agTextCellEditor")
+            # Campo de fecha con calendario
+            gb.configure_column("Fecha_contacto", editable=True, cellEditor="agDateCellEditor")
             
-            # También puedes configurar otros campos (teléfono, email, etc.)
-            gb.configure_column("telefono", editable=True, cellEditor="agTextCellEditor")
-            gb.configure_column("email", editable=True, cellEditor="agTextCellEditor")
-            gb.configure_column("observaciones", editable=True, cellEditor="agLargeTextCellEditor")
-            
-            # Para la fecha
-            gb.configure_column("fecha_contacto", editable=True, cellEditor="agDateCellEditor")
-            
-            # Para el check de "Contactado"
-            gb.configure_column("contactado", editable=True, cellEditor="agCheckboxCellEditor")
+            # Campo booleano con checkbox
+            gb.configure_column("Contactado", editable=True, cellEditor="agCheckboxCellEditor")
 
             gridOptions = gb.build()
     
