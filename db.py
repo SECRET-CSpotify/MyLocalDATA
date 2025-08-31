@@ -239,3 +239,46 @@ def obtener_contactos(cliente_id):
         pass
     return df
 
+# --- Debe decir (agregar en db.py) ---
+def actualizar_cliente_campos(cliente_id, updates: dict):
+    """
+    Actualiza un cliente dado su id con los campos provistos en 'updates'.
+    - cliente_id: id del cliente (int)
+    - updates: dict { 'telefono': '123', 'email': 'a@b.c', ... } con nombres EXACTOS de columnas en la BD.
+    Solo se permiten columnas en la lista 'allowed' para evitar actualizaciones arbitrarias.
+    """
+    if not updates:
+        return
+
+    # Lista blanca de columnas permitidas a actualizar (ajusta si necesitas otras)
+    allowed = {
+        "nombre", "nit", "contacto", "telefono", "email", "ciudad", "direccion",
+        "fecha_contacto", "observacion", "contactado",
+        "tipo_operacion", "modalidad", "origen", "destino", "mercancia",
+        "base_name"
+    }
+
+    # Filtrar updates para mantener solo columnas permitidas
+    safe_updates = {k: v for k, v in updates.items() if k in allowed}
+    if not safe_updates:
+        return
+
+    set_clauses = []
+    params = {"id": cliente_id}
+    for k, v in safe_updates.items():
+        # Usamos parámetros nombrados para evitar inyección
+        set_clauses.append(f"{k} = :{k}")
+        params[k] = v
+
+    sql = "UPDATE clientes SET " + ", ".join(set_clauses) + " WHERE id = :id"
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(sql), params)
+    except Exception as e:
+        # No detenemos la app, pero mostramos/logueamos el error
+        try:
+            import streamlit as st
+            st.error(f"Error actualizando cliente {cliente_id}: {e}")
+        except Exception:
+            pass
+        raise
