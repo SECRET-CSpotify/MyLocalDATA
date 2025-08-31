@@ -5,7 +5,10 @@ from io import BytesIO
 import yaml
 from yaml.loader import SafeLoader
 import streamlit_authenticator as stauth
-from db import crear_tabla, agregar_cliente, obtener_clientes, actualizar_cliente_detalle
+from db import crear_tabla, agregar_cliente, obtener_clientes, actualizar_cliente_detalle, \
+    eliminar_cliente, set_display_base_name, get_display_base_name, agendar_visita, obtener_visitas, \
+    agregar_contacto, obtener_contactos, actualizar_cliente_campos, engine, text
+
 from collections.abc import Mapping
 import traceback
 
@@ -318,17 +321,15 @@ if st.session_state.get("authentication_status") is True:
                     st.text(traceback.format_exc())
 
     # --------------------------
-    # Listado y exportación de clientes
+    # Listado y exportación de clientes (AgGrid con guardado automático)
     # --------------------------
-    # NOTA: definimos df_no y df_si ANTES de crear los tabs para evitar NameError
+    # Definimos df_no y df_si ANTES de los tabs
     df_no = pd.DataFrame()
     df_si = pd.DataFrame()
     
-    # calcular filtros según sesión / admin
     selected_base = st.session_state.get("selected_base_view", "TRANSLOGISTIC")
     
     if is_admin:
-        # Admin puede filtrar por base o username (sidebar)
         if filtrar_base and filtrar_base != "Todas":
             df_no = obtener_clientes(contactado=False, username=None, is_admin=True, base_name=filtrar_base)
             df_si = obtener_clientes(contactado=True, username=None, is_admin=True, base_name=filtrar_base)
@@ -339,38 +340,69 @@ if st.session_state.get("authentication_status") is True:
             df_no = obtener_clientes(contactado=False, is_admin=True)
             df_si = obtener_clientes(contactado=True, is_admin=True)
     else:
-        # Usuario normal: si seleccionó TRANSLOGISTIC mostrar la base compartida,
-        # si seleccionó su base privada convertirla a internal username__display
         if selected_base == "TRANSLOGISTIC":
             df_no = obtener_clientes(contactado=False, username=None, is_admin=False, base_name="TRANSLOGISTIC")
             df_si = obtener_clientes(contactado=True, username=None, is_admin=False, base_name="TRANSLOGISTIC")
         else:
-            # selected_base contiene el display name (ej: "Mi Base")
             internal_base = f"{username}__{selected_base}"
             df_no = obtener_clientes(contactado=False, username=username, is_admin=False, base_name=internal_base)
             df_si = obtener_clientes(contactado=True, username=username, is_admin=False, base_name=internal_base)
     
-    # IMPORT: si no lo tienes en la parte superior del archivo, importa AgGrid aquí UNA VEZ
+    # Import AgGrid — preferible tenerlo al top, pero lo dejamos aquí si no está importado antes
     from st_aggrid import AgGrid, GridOptionsBuilder, DataReturnMode, GridUpdateMode
     
     tab1, tab2 = st.tabs(["📋 No Contactados", "✅ Contactados"])
     
+    # --------------------------------------------------------------------
+    # Helper: mapping display columns <-> DB columns (debe coincidir con rename_columns_for_display)
+    # --------------------------------------------------------------------
+    rename_map = {
+        "nombre": "Nombre",
+        "nit": "NIT",
+        "contacto": "Persona de Contacto",
+        "telefono": "Teléfono",
+        "email": "Email",
+        "ciudad": "Ciudad",
+        "fecha_contacto": "Última Fecha de Contacto",
+        "observacion": "Observación",
+        "contactado": "Contactado",
+        "username": "Propietario",
+        "base_name": "Base",
+        "tipo_operacion": "Tipo de Operación",
+        "modalidad": "Modalidad",
+        "origen": "Origen",
+        "destino": "Destino",
+        "mercancia": "Mercancía",
+        "direccion": "Dirección",
+        "id": "id"
+    }
+    # Inverso: display -> db
+    display_to_db = {v: k for k, v in rename_map.items()}
+    
+    # -------------------------
+    # TAB 1: NO CONTACTADOS
+    # -------------------------
     with tab1:
         st.subheader("Clientes No Contactados")
     
-        # Filtro de búsqueda local (por nombre)
         filtro = st.text_input("🔍 Buscar cliente (filtra por Nombre)", key="filtro_no")
-        if filtro and not df_no.empty and "nombre" in df_no.columns:
-            df_no = df_no[df_no["nombre"].str.contains(filtro, case=False, na=False)]
+        df_no_filtered = df_no.copy()
+        if filtro and not df_no_filtered.empty and "nombre" in df_no_filtered.columns:
+            df_no_filtered = df_no_filtered[df_no_filtered["nombre"].str.contains(filtro, case=False, na=False)]
     
-        df_no_display = rename_columns_for_display(df_no)
+        df_no_display = rename_columns_for_display(df_no_filtered)
     
         if df_no_display is None or df_no_display.empty:
             st.info("No hay clientes para mostrar.")
         else:
+            # Guardamos una copia original en session_state para comparar ediciones
+            orig_no_key = "orig_no_map"
+            orig_no_map = {r["id"]: r for r in df_no_display.to_dict("records")}
+            st.session_state[orig_no_key] = orig_no_map
+    
             gb = GridOptionsBuilder.from_dataframe(df_no_display)
             gb.configure_default_column(filterable=True, editable=False, sortable=True, resizable=True)
-            editable_cols = ["Observación", "Teléfono", "Email"]
+            editable_cols = ["Observación", "Teléfono", "Email", "Dirección"]  # columnas editables (display names)
             for c in editable_cols:
                 if c in df_no_display.columns:
                     gb.configure_column(c, editable=True)
@@ -381,20 +413,80 @@ if st.session_state.get("authentication_status") is True:
                 df_no_display,
                 gridOptions=gridOptions,
                 enable_enterprise_modules=False,
-                update_mode=GridUpdateMode.MODEL_CHANGED,
+                update_mode=GridUpdateMode.MODEL_CHANGED,          # MODELO_CHANGED dispara en cada edición
                 data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
                 fit_columns_on_grid_load=True,
-                height=400
+                height=420
             )
     
-            # Descarga Excel: mostramos el botón si existen datos (usamos df_no original)
+            # --- Guardado automático de ediciones ---
+            try:
+                edited = pd.DataFrame(grid_response.get("data", []))
+                if not edited.empty:
+                    # comparar con originales en st.session_state
+                    orig_map = st.session_state.get(orig_no_key, {})
+                    for _, row in edited.iterrows():
+                        rid = row.get("id")
+                        if not rid:
+                            continue
+                        orig_row = orig_map.get(rid, {})
+                        updates_db = {}
+                        # Revisar cada columna visible si cambió
+                        for disp_col in edited.columns:
+                            # ignorar la columna 'id'
+                            if disp_col == "id":
+                                continue
+                            old_val = orig_row.get(disp_col)
+                            new_val = row.get(disp_col)
+                            # si hay cambio
+                            if (pd.isna(old_val) and (new_val is not None and new_val != "")) or (not pd.isna(old_val) and old_val != new_val):
+                                db_col = display_to_db.get(disp_col)
+                                if not db_col:
+                                    continue
+                                # manejo especial de fecha_contacto y contactado
+                                if db_col == "fecha_contacto":
+                                    # AgGrid puede devolver datetimes o strings; normalizamos a YYYY-MM-DD o None
+                                    try:
+                                        if new_val in (None, "", "None"):
+                                            updates_db[db_col] = None
+                                        elif hasattr(new_val, "date"):  # pandas Timestamp
+                                            updates_db[db_col] = str(new_val.date())
+                                        else:
+                                            # intentar parsear string o dejar tal cual
+                                            updates_db[db_col] = str(new_val)
+                                    except Exception:
+                                        updates_db[db_col] = str(new_val)
+                                elif db_col == "contactado":
+                                    # normalizar booleano
+                                    if isinstance(new_val, bool):
+                                        updates_db[db_col] = new_val
+                                    else:
+                                        # intentar convertir a booleano desde string/número
+                                        updates_db[db_col] = bool(new_val)
+                                else:
+                                    updates_db[db_col] = new_val
+                        if updates_db:
+                            try:
+                                actualizar_cliente_campos(rid, updates_db)
+                                # actualizar el original en session_state para no re-aplicar el mismo cambio
+                                for k_disp, v in row.items():
+                                    orig_map[rid][k_disp] = v
+                            except Exception as e:
+                                st.error(f"Error guardando cambios para id {rid}: {e}")
+                    # persistimos el mapa actualizado
+                    st.session_state[orig_no_key] = orig_map
+            except Exception as e:
+                # si algo falla no rompemos la app; lo logueamos
+                st.text(f"(Aviso) Error procesando ediciones automáticas: {e}")
+    
+            # Botón de exportar (usa df_no original sin renombrar para mantener campos DB)
             st.download_button(
                 "⬇️ Exportar clientes no contactados (.xlsx)",
-                data=exportar_excel(df_no),
+                data=exportar_excel(df_no_filtered),
                 file_name="clientes_no_contactados.xlsx"
             )
     
-            # Acciones sobre filas seleccionadas
+            # Acciones sobre filas seleccionadas (ejemplo: eliminar)
             selected_no = grid_response.get("selected_rows", [])
             if selected_no:
                 st.markdown(f"**Filas seleccionadas:** {len(selected_no)}")
@@ -410,22 +502,30 @@ if st.session_state.get("authentication_status") is True:
                         except Exception as e:
                             st.error(f"No se pudieron eliminar: {e}")
     
+    # -------------------------
+    # TAB 2: CONTACTADOS
+    # -------------------------
     with tab2:
         st.subheader("Clientes Contactados")
     
-        # Filtro de búsqueda local (por nombre)
         filtro2 = st.text_input("🔍 Buscar cliente (Contactados)", key="filtro_si")
-        if filtro2 and not df_si.empty and "nombre" in df_si.columns:
-            df_si = df_si[df_si["nombre"].str.contains(filtro2, case=False, na=False)]
+        df_si_filtered = df_si.copy()
+        if filtro2 and not df_si_filtered.empty and "nombre" in df_si_filtered.columns:
+            df_si_filtered = df_si_filtered[df_si_filtered["nombre"].str.contains(filtro2, case=False, na=False)]
     
-        if df_si is None or df_si.empty:
+        if df_si_filtered is None or df_si_filtered.empty:
             st.info("No hay clientes contactados para mostrar.")
         else:
-            df_si_display = rename_columns_for_display(df_si)
+            df_si_display = rename_columns_for_display(df_si_filtered)
+    
+            # Guardamos originales para comparación
+            orig_si_key = "orig_si_map"
+            orig_si_map = {r["id"]: r for r in df_si_display.to_dict("records")}
+            st.session_state[orig_si_key] = orig_si_map
     
             gb2 = GridOptionsBuilder.from_dataframe(df_si_display)
             gb2.configure_default_column(filterable=True, sortable=True, resizable=True)
-            editable_cols = ["Observación", "Teléfono", "Email"]
+            editable_cols = ["Observación", "Teléfono", "Email", "Dirección"]
             for c in editable_cols:
                 if c in df_si_display.columns:
                     gb2.configure_column(c, editable=True)
@@ -442,14 +542,63 @@ if st.session_state.get("authentication_status") is True:
                 height=420
             )
     
+            # --- Guardado automático de ediciones (igual que en tab1) ---
+            try:
+                edited2 = pd.DataFrame(grid_response2.get("data", []))
+                if not edited2.empty:
+                    orig_map2 = st.session_state.get(orig_si_key, {})
+                    for _, row in edited2.iterrows():
+                        rid = row.get("id")
+                        if not rid:
+                            continue
+                        orig_row = orig_map2.get(rid, {})
+                        updates_db = {}
+                        for disp_col in edited2.columns:
+                            if disp_col == "id":
+                                continue
+                            old_val = orig_row.get(disp_col)
+                            new_val = row.get(disp_col)
+                            if (pd.isna(old_val) and (new_val is not None and new_val != "")) or (not pd.isna(old_val) and old_val != new_val):
+                                db_col = display_to_db.get(disp_col)
+                                if not db_col:
+                                    continue
+                                if db_col == "fecha_contacto":
+                                    try:
+                                        if new_val in (None, "", "None"):
+                                            updates_db[db_col] = None
+                                        elif hasattr(new_val, "date"):
+                                            updates_db[db_col] = str(new_val.date())
+                                        else:
+                                            updates_db[db_col] = str(new_val)
+                                    except Exception:
+                                        updates_db[db_col] = str(new_val)
+                                elif db_col == "contactado":
+                                    if isinstance(new_val, bool):
+                                        updates_db[db_col] = new_val
+                                    else:
+                                        updates_db[db_col] = bool(new_val)
+                                else:
+                                    updates_db[db_col] = new_val
+                        if updates_db:
+                            try:
+                                actualizar_cliente_campos(rid, updates_db)
+                                # actualizar original en session_state
+                                for k_disp, v in row.items():
+                                    orig_map2[rid][k_disp] = v
+                            except Exception as e:
+                                st.error(f"Error guardando cambios para id {rid}: {e}")
+                    st.session_state[orig_si_key] = orig_map2
+            except Exception as e:
+                st.text(f"(Aviso) Error procesando ediciones automáticas en Contactados: {e}")
+    
             # Exportar Contactados
             st.download_button(
                 "⬇️ Exportar Contactados a Excel",
-                data=exportar_excel(df_si),
+                data=exportar_excel(df_si_filtered),
                 file_name="clientes_contactados.xlsx"
             )
     
-            # Acciones sobre filas seleccionadas
+            # Acciones sobre filas seleccionadas (ej: eliminar)
             selected = grid_response2.get("selected_rows", [])
             if selected:
                 st.markdown(f"**Filas seleccionadas:** {len(selected)}")
