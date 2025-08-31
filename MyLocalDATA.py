@@ -402,10 +402,7 @@ if st.session_state.get("authentication_status") is True:
     
             gb = GridOptionsBuilder.from_dataframe(df_no_display)
             gb.configure_default_column(filterable=True, editable=False, sortable=True, resizable=True)
-            editable_cols = ["Observación", "Teléfono", "Email", "Dirección"]  # columnas editables (display names)
-            for c in editable_cols:
-                if c in df_no_display.columns:
-                    gb.configure_column(c, editable=True)
+
             gb.configure_selection(selection_mode="multiple", use_checkbox=True)
 
             # Campos de texto editables
