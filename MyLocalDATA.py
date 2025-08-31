@@ -379,7 +379,7 @@ if st.session_state.get("authentication_status") is True:
                 )
 
 
-       from st_aggrid import AgGrid, GridOptionsBuilder, DataReturnMode, GridUpdateMode
+    from st_aggrid import AgGrid, GridOptionsBuilder, DataReturnMode, GridUpdateMode
     
     with tab2:
         st.subheader("Clientes Contactados")
