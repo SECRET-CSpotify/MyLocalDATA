@@ -692,10 +692,10 @@ if st.session_state.get("authentication_status") is True:
             origen = st.text_input("Origen", cliente.get("origen", ""))
             destino = st.text_input("Destino", cliente.get("destino", ""))
             mercancia = st.text_area("Mercancía", cliente.get("mercancia", ""))
-    
-            col_a, col_b = st.columns([1,1])
-            with col_a:
-                if st.form_submit_button("💾 Guardar cambios"):
+        
+            # Botón para guardar cambios (este SÍ está dentro del form)
+            if st.form_submit_button("💾 Guardar cambios"):
+                try:
                     actualizar_cliente_detalle(
                         cliente["id"],
                         {
@@ -707,17 +707,35 @@ if st.session_state.get("authentication_status") is True:
                         }
                     )
                     st.success("✅ Información detallada actualizada")
-    
-            with col_b:
-                # Botón eliminar (inicia confirmación)
-                if st.button("🗑️ Eliminar cliente"):
-                    st.warning("Estás a punto de eliminar este cliente. Esta acción es irreversible.")
-                    if st.button("Confirmar eliminación"):
-                        try:
-                            eliminar_cliente(cliente["id"])
-                            st.success("Cliente eliminado ✅")
-                        except Exception as e:
-                            st.error(f"No se pudo eliminar el cliente: {e}")
+                except Exception as e:
+                    st.error(f"Error guardando cambios: {e}")
+        
+        # ---- Fuera del form: acciones críticas (eliminar) ----
+        # Mantener botones fuera del 'with st.form' para evitar StreamlitAPIException
+        col_left, col_right = st.columns([1,1])
+        with col_right:
+            # Paso 1: mostrar botón inicial de eliminación (fuera del form)
+            if st.button("🗑️ Eliminar cliente"):
+                # Guardamos la intención de eliminar en session_state para mostrar confirmación
+                st.session_state.setdefault("confirm_delete_cliente", cliente["id"])
+        
+        # Si existe intención registrada y coincide con el cliente actual, mostramos confirmación
+        if st.session_state.get("confirm_delete_cliente") == cliente["id"]:
+            st.warning("⚠️ Estás a punto de eliminar este cliente. Esta acción es irreversible.")
+            confirma = st.button("Confirmar eliminación")
+            cancelar = st.button("Cancelar eliminación")
+            if confirma:
+                try:
+                    eliminar_cliente(cliente["id"])
+                    st.success("Cliente eliminado ✅")
+                    # limpiar la intención para evitar repeticiones
+                    st.session_state.pop("confirm_delete_cliente", None)
+                except Exception as e:
+                    st.error(f"No se pudo eliminar el cliente: {e}")
+            if cancelar:
+                st.session_state.pop("confirm_delete_cliente", None)
+                st.info("Eliminación cancelada.")
+        
 
     # -------------------------
     # Historial de contactos
