@@ -320,46 +320,63 @@ if st.session_state.get("authentication_status") is True:
     # --------------------------
     # Listado y exportación de clientes
     # --------------------------
+    # NOTA: definimos df_no y df_si ANTES de crear los tabs para evitar NameError
+    df_no = pd.DataFrame()
+    df_si = pd.DataFrame()
+    
+    # calcular filtros según sesión / admin
+    selected_base = st.session_state.get("selected_base_view", "TRANSLOGISTIC")
+    
+    if is_admin:
+        # Admin puede filtrar por base o username (sidebar)
+        if filtrar_base and filtrar_base != "Todas":
+            df_no = obtener_clientes(contactado=False, username=None, is_admin=True, base_name=filtrar_base)
+            df_si = obtener_clientes(contactado=True, username=None, is_admin=True, base_name=filtrar_base)
+        elif filtrar_username:
+            df_no = obtener_clientes(contactado=False, username=filtrar_username, is_admin=True)
+            df_si = obtener_clientes(contactado=True, username=filtrar_username, is_admin=True)
+        else:
+            df_no = obtener_clientes(contactado=False, is_admin=True)
+            df_si = obtener_clientes(contactado=True, is_admin=True)
+    else:
+        # Usuario normal: si seleccionó TRANSLOGISTIC mostrar la base compartida,
+        # si seleccionó su base privada convertirla a internal username__display
+        if selected_base == "TRANSLOGISTIC":
+            df_no = obtener_clientes(contactado=False, username=None, is_admin=False, base_name="TRANSLOGISTIC")
+            df_si = obtener_clientes(contactado=True, username=None, is_admin=False, base_name="TRANSLOGISTIC")
+        else:
+            # selected_base contiene el display name (ej: "Mi Base")
+            internal_base = f"{username}__{selected_base}"
+            df_no = obtener_clientes(contactado=False, username=username, is_admin=False, base_name=internal_base)
+            df_si = obtener_clientes(contactado=True, username=username, is_admin=False, base_name=internal_base)
+    
+    # IMPORT: si no lo tienes en la parte superior del archivo, importa AgGrid aquí UNA VEZ
+    from st_aggrid import AgGrid, GridOptionsBuilder, DataReturnMode, GridUpdateMode
+    
     tab1, tab2 = st.tabs(["📋 No Contactados", "✅ Contactados"])
-
+    
     with tab1:
         st.subheader("Clientes No Contactados")
-        # calcular filtros según sesión / admin
-        selected_base = st.session_state.get("selected_base_view", "TRANSLOGISTIC")
-        if is_admin:
-            if filtrar_base and filtrar_base != "Todas":
-                df_no = obtener_clientes(contactado=False, username=None, is_admin=True, base_name=filtrar_base)
-            elif filtrar_username:
-                df_no = obtener_clientes(contactado=False, username=filtrar_username, is_admin=True)
-            else:
-                df_no = obtener_clientes(contactado=False, is_admin=True)
-        else:
-            # usuario no admin: mostrar por defecto su base privada o TRANSLOGISTIC, según selección
-            base_arg = None if selected_base == "TRANSLOGISTIC" else selected_base
-            df_no = obtener_clientes(contactado=False, username=username, is_admin=False, base_name=base_arg)
-
-        filtro = st.text_input("🔍 Buscar cliente (filtra por Nombre)")
+    
+        # Filtro de búsqueda local (por nombre)
+        filtro = st.text_input("🔍 Buscar cliente (filtra por Nombre)", key="filtro_no")
         if filtro and not df_no.empty and "nombre" in df_no.columns:
             df_no = df_no[df_no["nombre"].str.contains(filtro, case=False, na=False)]
-
-        from st_aggrid import AgGrid, GridOptionsBuilder, DataReturnMode, GridUpdateMode
-        
+    
         df_no_display = rename_columns_for_display(df_no)
-        
+    
         if df_no_display is None or df_no_display.empty:
             st.info("No hay clientes para mostrar.")
         else:
             gb = GridOptionsBuilder.from_dataframe(df_no_display)
-            # Habilitar filtros y edición por columna (editable solo las columnas no-iden)
             gb.configure_default_column(filterable=True, editable=False, sortable=True, resizable=True)
-            # Si quieres permitir edición en algunas columnas:
-            editable_cols = ["Observación", "Teléfono", "Email"]  # ejemplo, solo editar campo observación/teléfono/email
+            editable_cols = ["Observación", "Teléfono", "Email"]
             for c in editable_cols:
                 if c in df_no_display.columns:
                     gb.configure_column(c, editable=True)
             gb.configure_selection(selection_mode="multiple", use_checkbox=True)
             gridOptions = gb.build()
-        
+    
             grid_response = AgGrid(
                 df_no_display,
                 gridOptions=gridOptions,
@@ -369,44 +386,52 @@ if st.session_state.get("authentication_status") is True:
                 fit_columns_on_grid_load=True,
                 height=400
             )
-        
-            # Descarga Excel de los datos filtrados (usar df_no, que tiene columnas originales)
-            if st.button("⬇️ Exportar a Excel"):
-                st.download_button(
-                    "Descargar clientes no contactados (.xlsx)",
-                    data=exportar_excel(df_no),
-                    file_name="clientes_no_contactados.xlsx"
-                )
-
-
-    from st_aggrid import AgGrid, GridOptionsBuilder, DataReturnMode, GridUpdateMode
+    
+            # Descarga Excel: mostramos el botón si existen datos (usamos df_no original)
+            st.download_button(
+                "⬇️ Exportar clientes no contactados (.xlsx)",
+                data=exportar_excel(df_no),
+                file_name="clientes_no_contactados.xlsx"
+            )
+    
+            # Acciones sobre filas seleccionadas
+            selected_no = grid_response.get("selected_rows", [])
+            if selected_no:
+                st.markdown(f"**Filas seleccionadas:** {len(selected_no)}")
+                if st.button("🗑️ Eliminar seleccionados (No Contactados)", key="eliminar_no"):
+                    st.warning("Confirmar: se eliminarán los clientes seleccionados.")
+                    if st.button("Confirmar eliminación seleccionados (No Contactados)", key="confirm_eliminar_no"):
+                        try:
+                            for row in selected_no:
+                                rid = row.get("id")
+                                if rid:
+                                    eliminar_cliente(rid)
+                            st.success("Clientes seleccionados eliminados ✅")
+                        except Exception as e:
+                            st.error(f"No se pudieron eliminar: {e}")
     
     with tab2:
         st.subheader("Clientes Contactados")
     
-        # 'df_si' debe venir de la lógica previa (admin vs user)
-        # Si no existe o está vacío, mostramos mensaje
+        # Filtro de búsqueda local (por nombre)
+        filtro2 = st.text_input("🔍 Buscar cliente (Contactados)", key="filtro_si")
+        if filtro2 and not df_si.empty and "nombre" in df_si.columns:
+            df_si = df_si[df_si["nombre"].str.contains(filtro2, case=False, na=False)]
+    
         if df_si is None or df_si.empty:
             st.info("No hay clientes contactados para mostrar.")
         else:
-            # Preparamos la versión para visualización (columnas renombradas)
             df_si_display = rename_columns_for_display(df_si)
     
-            # Construir opciones de AgGrid
             gb2 = GridOptionsBuilder.from_dataframe(df_si_display)
-            # Habilitar filtros y sorting por columna
             gb2.configure_default_column(filterable=True, sortable=True, resizable=True)
-            # Marcar columnas que queremos permitir editar (ejemplo: Observación, Teléfono, Email)
             editable_cols = ["Observación", "Teléfono", "Email"]
             for c in editable_cols:
                 if c in df_si_display.columns:
                     gb2.configure_column(c, editable=True)
-    
-            # Multiselección con checkboxes
             gb2.configure_selection(selection_mode="multiple", use_checkbox=True)
             gridOptions2 = gb2.build()
     
-            # Mostrar la grilla
             grid_response2 = AgGrid(
                 df_si_display,
                 gridOptions=gridOptions2,
@@ -417,26 +442,20 @@ if st.session_state.get("authentication_status") is True:
                 height=420
             )
     
-            # Botón para exportar los datos (usa el df original 'df_si' para mantener nombres de columna de DB)
-            col_dl, col_actions = st.columns([1, 1])
-            with col_dl:
-                if st.button("⬇️ Exportar Contactados a Excel"):
-                    st.download_button(
-                        "Descargar clientes contactados (.xlsx)",
-                        data=exportar_excel(df_si),  # usa tu función exportar_excel existente
-                        file_name="clientes_contactados.xlsx"
-                    )
+            # Exportar Contactados
+            st.download_button(
+                "⬇️ Exportar Contactados a Excel",
+                data=exportar_excel(df_si),
+                file_name="clientes_contactados.xlsx"
+            )
     
             # Acciones sobre filas seleccionadas
             selected = grid_response2.get("selected_rows", [])
             if selected:
                 st.markdown(f"**Filas seleccionadas:** {len(selected)}")
-                # ejemplo: mostrar botones de acción sobre las filas seleccionadas
-                if st.button("🗑️ Eliminar seleccionados"):
+                if st.button("🗑️ Eliminar seleccionados (Contactados)", key="eliminar_si"):
                     st.warning("Confirmar: se eliminarán los clientes seleccionados.")
-                    if st.button("Confirmar eliminación seleccionados"):
-                        # Aquí deberías iterar por cada selected y llamar a eliminar_cliente(id)
-                        # Asegúrate que la grilla incluya la columna 'id' para identificar registros.
+                    if st.button("Confirmar eliminación seleccionados (Contactados)", key="confirm_eliminar_si"):
                         try:
                             for row in selected:
                                 rid = row.get("id")
@@ -445,6 +464,7 @@ if st.session_state.get("authentication_status") is True:
                             st.success("Clientes seleccionados eliminados ✅")
                         except Exception as e:
                             st.error(f"No se pudieron eliminar: {e}")
+
     
             # --- OPCIONAL: Persistir cambios editados en la DB ---
             # grid_response2['data'] contiene la tabla tal como quedó tras edición en AgGrid.
