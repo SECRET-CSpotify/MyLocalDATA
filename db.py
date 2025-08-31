@@ -195,8 +195,19 @@ def actualizar_cliente_detalle(cliente_id, datos):
 
 # --- Debe decir (agregar estas funciones nuevas) ---
 def eliminar_cliente(cliente_id):
+    try:
+        cliente_id = int(cliente_id)
+    except Exception:
+        try:
+            import streamlit as st
+            st.error(f"ID inválido para eliminar cliente: {cliente_id}")
+        except Exception:
+            pass
+        return
+
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM clientes WHERE id = :id"), {"id": cliente_id})
+
 
 def set_display_base_name(username, display_name):
     # guarda/actualiza en users
@@ -213,6 +224,16 @@ def get_display_base_name(username):
         return res[0] if res else None
 
 def agendar_visita(cliente_id, fecha, medio, creado_por):
+    try:
+        cliente_id = int(cliente_id)
+    except Exception:
+        try:
+            import streamlit as st
+            st.error(f"ID inválido al agendar visita: {cliente_id}")
+        except Exception:
+            pass
+        return
+
     with engine.begin() as conn:
         conn.execute(text("""
             INSERT INTO visitas (cliente_id, fecha, medio, creado_por)
@@ -222,21 +243,29 @@ def agendar_visita(cliente_id, fecha, medio, creado_por):
 def obtener_visitas(cliente_id):
     """
     Retorna un DataFrame con las visitas agendadas para cliente_id.
-    Si hay cualquier error (tabla no existe, problema SQL, etc.) retorna DataFrame vacío
-    y registra el error en Streamlit para su depuración.
+    Convierte cliente_id a int nativo para evitar errores con numpy.int64.
     """
     try:
-        # Usamos engine.connect() y result.mappings() para obtener un iterable de dicts
+        # Normalizar cliente_id a int de Python cuando sea posible
+        if cliente_id is None:
+            return pd.DataFrame()
+        try:
+            cliente_id = int(cliente_id)
+        except Exception:
+            # si no se puede convertir, devolvemos vacío y mostramos mensaje
+            import streamlit as st
+            st.error(f"ID de cliente inválido al leer visitas: {cliente_id}")
+            return pd.DataFrame()
+
         with engine.connect() as conn:
             stmt = text("SELECT * FROM visitas WHERE cliente_id = :cliente_id ORDER BY fecha DESC")
             result = conn.execute(stmt, {"cliente_id": cliente_id})
-            rows = result.mappings().all()  # lista de OrderedDict / dict
+            rows = result.mappings().all()
             if not rows:
                 return pd.DataFrame()
             df = pd.DataFrame(rows)
             return df
     except Exception as e:
-        # No romper la app: mostrar el error en UI (logs) y devolver DataFrame vacío
         try:
             import streamlit as st
             st.error(f"Error leyendo visitas para cliente {cliente_id}: {e}")
@@ -246,6 +275,16 @@ def obtener_visitas(cliente_id):
 
 
 def agregar_contacto(cliente_id, fecha, tipo, notas=""):
+    try:
+        cliente_id = int(cliente_id)
+    except Exception:
+        try:
+            import streamlit as st
+            st.error(f"ID inválido al agregar contacto: {cliente_id}")
+        except Exception:
+            pass
+        return
+
     with engine.begin() as conn:
         conn.execute(text("""
             INSERT INTO contactos (cliente_id, fecha, tipo, notas)
@@ -253,21 +292,40 @@ def agregar_contacto(cliente_id, fecha, tipo, notas=""):
         """), {"cliente_id": cliente_id, "fecha": fecha, "tipo": tipo, "notas": notas})
 
 def obtener_contactos(cliente_id):
-    df = pd.DataFrame()
+    """
+    Retorna DataFrame con contactos para cliente_id. Normaliza cliente_id a int.
+    """
     try:
-        df = pd.read_sql(text("SELECT * FROM contactos WHERE cliente_id = :cliente_id ORDER BY fecha DESC"), engine, params={"cliente_id": cliente_id})
-    except Exception:
-        pass
-    return df
+        if cliente_id is None:
+            return pd.DataFrame()
+        try:
+            cliente_id = int(cliente_id)
+        except Exception:
+            import streamlit as st
+            st.error(f"ID de cliente inválido al leer contactos: {cliente_id}")
+            return pd.DataFrame()
 
-# --- Debe decir (agregar en db.py) ---
+        with engine.connect() as conn:
+            stmt = text("SELECT * FROM contactos WHERE cliente_id = :cliente_id ORDER BY fecha DESC")
+            result = conn.execute(stmt, {"cliente_id": cliente_id})
+            rows = result.mappings().all()
+            if not rows:
+                return pd.DataFrame()
+            return pd.DataFrame(rows)
+    except Exception as e:
+        try:
+            import streamlit as st
+            st.error(f"Error leyendo contactos para cliente {cliente_id}: {e}")
+        except Exception:
+            pass
+        return pd.DataFrame()
+
+
 def actualizar_cliente_campos(cliente_id, updates: dict):
-    """
-    Actualiza un cliente dado su id con los campos provistos en 'updates'.
-    - cliente_id: id del cliente (int)
-    - updates: dict { 'telefono': '123', 'email': 'a@b.c', ... } con nombres EXACTOS de columnas en la BD.
-    Solo se permiten columnas en la lista 'allowed' para evitar actualizaciones arbitrarias.
-    """
+    try:
+        cliente_id = int(cliente_id)
+    except Exception:
+        return
     if not updates:
         return
 
