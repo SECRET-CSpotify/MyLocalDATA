@@ -220,9 +220,30 @@ def agendar_visita(cliente_id, fecha, medio, creado_por):
         """), {"cliente_id": cliente_id, "fecha": fecha, "medio": medio, "creado_por": creado_por})
 
 def obtener_visitas(cliente_id):
-    with engine.begin() as conn:
-        df = pd.read_sql(text("SELECT * FROM visitas WHERE cliente_id = :cliente_id ORDER BY fecha DESC"), engine, params={"cliente_id": cliente_id})
-        return df
+    """
+    Retorna un DataFrame con las visitas agendadas para cliente_id.
+    Si hay cualquier error (tabla no existe, problema SQL, etc.) retorna DataFrame vacío
+    y registra el error en Streamlit para su depuración.
+    """
+    try:
+        # Usamos engine.connect() y result.mappings() para obtener un iterable de dicts
+        with engine.connect() as conn:
+            stmt = text("SELECT * FROM visitas WHERE cliente_id = :cliente_id ORDER BY fecha DESC")
+            result = conn.execute(stmt, {"cliente_id": cliente_id})
+            rows = result.mappings().all()  # lista de OrderedDict / dict
+            if not rows:
+                return pd.DataFrame()
+            df = pd.DataFrame(rows)
+            return df
+    except Exception as e:
+        # No romper la app: mostrar el error en UI (logs) y devolver DataFrame vacío
+        try:
+            import streamlit as st
+            st.error(f"Error leyendo visitas para cliente {cliente_id}: {e}")
+        except Exception:
+            pass
+        return pd.DataFrame()
+
 
 def agregar_contacto(cliente_id, fecha, tipo, notas=""):
     with engine.begin() as conn:
