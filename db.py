@@ -49,7 +49,6 @@ def crear_tabla():
         """))
 
         # Asegurar columnas existentes en caso de migración
-        conn.execute(text("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS direccion TEXT;"))
         conn.execute(text("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS base_name TEXT;"))
 
         # Índices para búsqueda rápida
@@ -116,7 +115,7 @@ def agregar_cliente(datos):
                 datos2["fecha_contacto"] = None
 
     # Asegurar llaves esperadas
-    for k in ("nombre","nit","contacto","telefono","email","ciudad","observacion","username","base_name","direccion"):
+    for k in ("nombre","nit","contacto","telefono","email","ciudad","direccion","observacion","username","base_name"):
         datos2.setdefault(k, None)
 
     # Normalizar base_name privada para evitar colisiones:
