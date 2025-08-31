@@ -363,6 +363,7 @@ if st.session_state.get("authentication_status") is True:
         "telefono": "Teléfono",
         "email": "Email",
         "ciudad": "Ciudad",
+        "direccion": "Dirección",
         "fecha_contacto": "Última Fecha de Contacto",
         "observacion": "Observación",
         "contactado": "Contactado",
@@ -373,7 +374,6 @@ if st.session_state.get("authentication_status") is True:
         "origen": "Origen",
         "destino": "Destino",
         "mercancia": "Mercancía",
-        "direccion": "Dirección",
         "id": "id"
     }
     # Inverso: display -> db
