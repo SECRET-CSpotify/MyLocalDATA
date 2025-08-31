@@ -258,7 +258,7 @@ if st.session_state.get("authentication_status") is True:
     # Encabezado
     # --------------------------
     st.markdown("<h1 style='text-align:center;'>📂 MyLocalDATA</h1>", unsafe_allow_html=True)
-    st.markdown("<h2 style='text-align:center;'>Gestor de Clientes - Agencia de Carga Internacional</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center;'>Gestor de Clientes</h2>", unsafe_allow_html=True)
 
     # --------------------------
     # Formulario para registrar cliente
