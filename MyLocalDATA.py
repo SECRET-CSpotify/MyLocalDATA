@@ -407,6 +407,26 @@ if st.session_state.get("authentication_status") is True:
                 if c in df_no_display.columns:
                     gb.configure_column(c, editable=True)
             gb.configure_selection(selection_mode="multiple", use_checkbox=True)
+
+            
+            # Aquí pegas las configuraciones específicas 👇
+            gb.configure_column("nombre", editable=True, cellEditor="agTextCellEditor")
+            gb.configure_column("nit", editable=True, cellEditor="agTextCellEditor")
+            gb.configure_column("persona_contacto", editable=True, cellEditor="agTextCellEditor")
+            gb.configure_column("direccion", editable=True, cellEditor="agTextCellEditor")
+            gb.configure_column("ciudad", editable=True, cellEditor="agTextCellEditor")
+            
+            # También puedes configurar otros campos (teléfono, email, etc.)
+            gb.configure_column("telefono", editable=True, cellEditor="agTextCellEditor")
+            gb.configure_column("email", editable=True, cellEditor="agTextCellEditor")
+            gb.configure_column("observaciones", editable=True, cellEditor="agLargeTextCellEditor")
+            
+            # Para la fecha
+            gb.configure_column("fecha_contacto", editable=True, cellEditor="agDateCellEditor")
+            
+            # Para el check de "Contactado"
+            gb.configure_column("contactado", editable=True, cellEditor="agCheckboxCellEditor")
+
             gridOptions = gb.build()
     
             grid_response = AgGrid(
