@@ -566,11 +566,25 @@ if st.session_state.get("authentication_status") is True:
     
             gb2 = GridOptionsBuilder.from_dataframe(df_si_display)
             gb2.configure_default_column(filterable=True, sortable=True, resizable=True)
-            editable_cols = ["Observación", "Teléfono", "Email", "Dirección"]
-            for c in editable_cols:
-                if c in df_si_display.columns:
-                    gb2.configure_column(c, editable=True)
+
             gb2.configure_selection(selection_mode="multiple", use_checkbox=True)
+
+            # Campos de texto editables
+            gb.configure_column("Nombre", editable=True, cellEditor="agTextCellEditor")
+            gb.configure_column("NIT", editable=True, cellEditor="agTextCellEditor")
+            gb.configure_column("Persona de Contacto", editable=True, cellEditor="agTextCellEditor")
+            gb.configure_column("Dirección", editable=True, cellEditor="agTextCellEditor")
+            gb.configure_column("Ciudad", editable=True, cellEditor="agTextCellEditor")
+            gb.configure_column("Teléfono", editable=True, cellEditor="agTextCellEditor")
+            gb.configure_column("Email", editable=True, cellEditor="agTextCellEditor")
+            gb.configure_column("Observación", editable=True, cellEditor="agLargeTextCellEditor")
+            
+            # Campo de fecha con calendario
+            gb.configure_column("Última Fecha de Contacto", editable=True, cellEditor="agDateCellEditor")
+            
+            # Campo booleano con checkbox
+            gb.configure_column("Contactado", editable=True, cellEditor="agCheckboxCellEditor")
+
             gridOptions2 = gb2.build()
     
             grid_response2 = AgGrid(
