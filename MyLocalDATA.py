@@ -696,43 +696,6 @@ if st.session_state.get("authentication_status") is True:
                         except Exception as e:
                             st.error(f"No se pudieron eliminar: {e}")
 
-    
-            # --- OPCIONAL: Persistir cambios editados en la DB ---
-            # grid_response2['data'] contiene la tabla tal como quedó tras edición en AgGrid.
-            # Para persistir cambios necesitas comparar con df_si_display y ejecutar UPDATEs.
-            # Aquí te dejo un ejemplo sencillo (descomentarlo solo si deseas usarlo):
-            #
-            # if st.button("💾 Aplicar cambios editados"):
-            #     edited_df = pd.DataFrame(grid_response2['data'])
-            #     # Asegúrate de que 'id' esté presente en edited_df para mapear a la tabla DB
-            #     for _, row in edited_df.iterrows():
-            #         rid = row.get("id")
-            #         if not rid:
-            #             continue
-            #         # Construir dict con columnas que quieras actualizar (usar nombres de DB, no los renombrados)
-            #         # Ej: si en rename_columns_for_display "Observación" corresponde a "observacion"
-            #         updates = {}
-            #         if "Observación" in row.index:
-            #             updates["observacion"] = row["Observación"]
-            #         if "Teléfono" in row.index:
-            #             updates["telefono"] = row["Teléfono"]
-            #         if "Email" in row.index:
-            #             updates["email"] = row["Email"]
-            #         if updates:
-            #             # ejecuta un UPDATE directo (debes implementar una función en db.py o usar engine)
-            #             # ejemplo rápido (requiere importar 'engine' y 'text' desde db.py):
-            #             with engine.begin() as conn:
-            #                 stmt = text("""
-            #                     UPDATE clientes SET
-            #                         telefono = COALESCE(:telefono, telefono),
-            #                         email = COALESCE(:email, email),
-            #                         observacion = COALESCE(:observacion, observacion)
-            #                     WHERE id = :id
-            #                 """)
-            #                 params = {"id": rid, "telefono": updates.get("telefono"), "email": updates.get("email"), "observacion": updates.get("observacion")}
-            #                 conn.execute(stmt, params)
-            #     st.success("Cambios aplicados a la base de datos.")
-
     # --------------------------
     # Vista detallada y edición
     # --------------------------
