@@ -11,6 +11,39 @@ from db import crear_tabla, agregar_cliente, obtener_clientes, actualizar_client
 
 from collections.abc import Mapping
 import traceback
+import time
+
+def safe_rerun():
+    """
+    Intenta forzar un rerun de la app.
+    - Primero intenta st.experimental_rerun() (si existe).
+    - Si no existe, actualiza los query-params usando experimental_set_query_params()
+      lo que provoca también un rerun.
+    - Si todo falla, deja una marca en session_state para que el código cliente pueda reaccionar.
+    """
+    try:
+        # intento directo (si la función existe)
+        st.experimental_rerun()
+        return
+    except Exception:
+        pass
+
+    # fallback: cambiar query params para provocar rerun
+    try:
+        params = st.experimental_get_query_params()
+        # añadir/actualizar clave _refresh con timestamp
+        params["_refresh"] = int(time.time())
+        st.experimental_set_query_params(**params)
+        return
+    except Exception:
+        pass
+
+    # último recurso: marcar en session_state (al menos el app puede leer esto en el siguiente run)
+    try:
+        st.session_state["_force_refresh"] = int(time.time())
+    except Exception:
+        # si ni siquiera esto funciona, silenciosamente no hacemos nada más
+        pass
 
 # --------------------------
 # Configuración general
@@ -522,7 +555,7 @@ if st.session_state.get("authentication_status") is True:
                     
                     # Para que la UI refleje el cambio inmediatamente (mover registro entre tabs, etc.)
                     # forzamos una recarga controlada del script. Esto NO borra cookies de autenticación.
-                    st.experimental_rerun()
+                    safe_rerun()
 
             except Exception as e:
                 # si algo falla no rompemos la app; lo logueamos
@@ -682,7 +715,7 @@ if st.session_state.get("authentication_status") is True:
                     st.session_state[orig_si_key] = orig_map2
                     # Para que la UI refleje el cambio inmediatamente (mover registro entre tabs, etc.)
                     # forzamos una recarga controlada del script. Esto NO borra cookies de autenticación.
-                    st.experimental_rerun()
+                    safe_rerun()
 
             except Exception as e:
                 st.text(f"(Aviso) Error procesando ediciones automáticas en Contactados: {e}")
