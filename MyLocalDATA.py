@@ -159,16 +159,16 @@ if st.session_state.get("authentication_status") is True:
     # --------------------------
     page_bg = """
     <style>
-    /* Cargar Faculty Glyphic hospedada en tu servidor (ej: https://tudominio.com/fonts/FacultyGlyphic.woff2) */
     @font-face {
         font-family: 'Faculty Glyphic';
-        src: url('https://fonts.gstatic.com/s/facultyglyphic/v4/RrQIbot2-iBvI2mYSyKIrcgoBuQ4Eu2EBVk.woff2') format('woff2');
+        src: url('https://fonts.gstatic.com/s/facultyglyphic/v4/RrQIbot2-iBvI2mYSyKIrcgoBuQ4Eu2EBVk.woff2') format('woff2'),
+            url('https://fonts.gstatic.com/s/facultyglyphic/v4/RrQIbot2-iBvI2mYSyKIrcgoBuQ4HO2E.woff2') format('woff2');
         font-weight: 300 800;
         font-style: normal;
         font-display: swap;
     }
     
-    :root { --main-font: 'Faculty Glyphic', 'Poppins', sans-serif; }
+    :root { --main-font: 'Faculty Glyphic'; }
 
     html, body, [class*="css"], .stMarkdown, .stText, .stDataFrame, table {
         font-family: var(--main-font) !important;
