@@ -17,9 +17,9 @@ def safe_rerun():
     """
     Intenta forzar un rerun de la app.
     - Primero intenta st.experimental_rerun() (si existe).
-    - Si no existe, actualiza los query-params usando experimental_set_query_params()
-      lo que provoca también un rerun.
-    - Si todo falla, deja una marca en session_state para que el código cliente pueda reaccionar.
+    - Si no existe, usa st.query_params como fallback para forzar un rerun
+      (st.query_params espera valores como listas de strings, por eso convertimos).
+    - Si todo falla, deja una marca en session_state para que el siguiente run lo detecte.
     """
     try:
         # intento directo (si la función existe)
@@ -28,12 +28,14 @@ def safe_rerun():
     except Exception:
         pass
 
-    # fallback: cambiar query params para provocar rerun
+    # fallback: cambiar query params usando la API st.query_params
     try:
-        params = st.experimental_get_query_params()
-        # añadir/actualizar clave _refresh con timestamp
-        params["_refresh"] = int(time.time())
-        st.experimental_set_query_params(**params)
+        # st.query_params es un mapping parecido a {str: list[str]}
+        params = dict(st.query_params)  # copia para modificar
+        # actualizar la clave _refresh con timestamp (usar lista de strings)
+        params["_refresh"] = [str(int(time.time()))]
+        # escribir de vuelta en st.query_params (esto provoca un rerun)
+        st.query_params = params
         return
     except Exception:
         pass
@@ -44,6 +46,7 @@ def safe_rerun():
     except Exception:
         # si ni siquiera esto funciona, silenciosamente no hacemos nada más
         pass
+
 
 # --------------------------
 # Configuración general
