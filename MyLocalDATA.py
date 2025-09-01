@@ -423,7 +423,11 @@ if st.session_state.get("authentication_status") is True:
     # Crear tabs
     tab1, tab2 = st.tabs(["📋 No Contactados", "✅ Contactados"])
 
-    
+    st.write("DEBUG: df_no_cached columns:", None if st.session_state.get('df_no_cached') is None else st.session_state['df_no_cached'].columns.tolist())
+    st.write("DEBUG: df_si_cached columns:", None if st.session_state.get('df_si_cached') is None else st.session_state['df_si_cached'].columns.tolist())
+    st.write("DEBUG: len df_no_cached:", None if st.session_state.get('df_no_cached') is None else len(st.session_state['df_no_cached']))
+    st.write("DEBUG: len df_si_cached:", None if st.session_state.get('df_si_cached') is None else len(st.session_state['df_si_cached']))
+
     # --------------------------------------------------------------------
     # Helper: mapping display columns <-> DB columns (debe coincidir con rename_columns_for_display)
     # --------------------------------------------------------------------
