@@ -595,6 +595,15 @@ if st.session_state.get("authentication_status") is True:
                                     cliente_id_param = rid_str
                                 actualizar_cliente_campos(cliente_id_param, updates_db)
                                 applied_any_update = True
+                                # (VERIFICACIÓN INMEDIATA) — comprobar directamente en la BD que el update se aplicó
+                                try:
+                                    with engine.connect() as conn:
+                                        check = conn.execute(text("SELECT id, contactado, fecha_contacto FROM clientes WHERE id = :id"), {"id": cliente_id_param}).fetchone()
+                                        # Mostrar mensaje de debug en la app (visible solo para ti)
+                                        st.info(f"DEBUG Update -> id={cliente_id_param} DB row: {dict(check) if check is not None else None}")
+                                except Exception as e:
+                                    st.error(f"DEBUG Update -> Error verificando DB id={cliente_id_param}: {e}")
+
                                 orig_map.setdefault(rid_str, {})
                                 for k_disp, v in row.items():
                                     orig_map[rid_str][k_disp] = v
@@ -704,9 +713,7 @@ if st.session_state.get("authentication_status") is True:
                                     st.session_state['df_si_cached'] = df_si
                                 except Exception as e:
                                     st.error(f"Error refrescando datos tras eliminación: {e}")
-                            
-                                # Forzar rerun controlado para que la UI se actualice
-                                safe_rerun()
+                    
 
                             else:
                                 st.info("No se eliminaron registros.")
@@ -847,6 +854,15 @@ if st.session_state.get("authentication_status") is True:
                                     cliente_id_param = rid_str
                                 actualizar_cliente_campos(cliente_id_param, updates_db)
                                 applied_any_update = True
+                                # (VERIFICACIÓN INMEDIATA) — comprobar directamente en la BD que el update se aplicó
+                                try:
+                                    with engine.connect() as conn:
+                                        check = conn.execute(text("SELECT id, contactado, fecha_contacto FROM clientes WHERE id = :id"), {"id": cliente_id_param}).fetchone()
+                                        # Mostrar mensaje de debug en la app (visible solo para ti)
+                                        st.info(f"DEBUG Update -> id={cliente_id_param} DB row: {dict(check) if check is not None else None}")
+                                except Exception as e:
+                                    st.error(f"DEBUG Update -> Error verificando DB id={cliente_id_param}: {e}")
+
                                 orig_map2.setdefault(rid_str, {})
                                 for k_disp, v in row.items():
                                     orig_map2[rid_str][k_disp] = v
@@ -921,6 +937,14 @@ if st.session_state.get("authentication_status") is True:
                                 try:
                                     eliminar_cliente(int(rid))
                                     deleted_any = True
+                                    # (VERIFICACIÓN INMEDIATA) — comprobar en la BD que la fila fue eliminada
+                                    try:
+                                        with engine.connect() as conn:
+                                            check_del = conn.execute(text("SELECT id FROM clientes WHERE id = :id"), {"id": int(rid)}).fetchone()
+                                            st.info(f"DEBUG Delete -> id={rid} presente en BD?: {False if check_del is None else True}")
+                                    except Exception as e:
+                                        st.error(f"DEBUG Delete -> Error verificando eliminación id={rid}: {e}")
+
                                 except Exception as e:
                                     st.error(f"No se pudo eliminar id {rid}: {e}")
                             if deleted_any:
