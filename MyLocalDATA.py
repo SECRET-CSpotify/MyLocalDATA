@@ -424,7 +424,7 @@ if st.session_state.get("authentication_status") is True:
     # Inverso: display -> db
     display_to_db = {v: k for k, v in rename_map.items()}
     
-    # -------------------------
+    # ------------------------- 
     # TAB 1: NO CONTACTADOS
     # -------------------------
     with tab1:
@@ -435,26 +435,46 @@ if st.session_state.get("authentication_status") is True:
         if filtro and not df_no_filtered.empty and "nombre" in df_no_filtered.columns:
             df_no_filtered = df_no_filtered[df_no_filtered["nombre"].str.contains(filtro, case=False, na=False)]
     
+        # Normalizar y preparar DF para mostrar
         df_no_display = rename_columns_for_display(df_no_filtered)
     
-        if df_no_display is None or df_no_display.empty:
+        # Si rename_columns_for_display eliminó 'id', lo recuperamos desde df_no_filtered
+        if df_no_display is None:
+            df_no_display = pd.DataFrame()
+    
+        if "id" not in df_no_display.columns and "id" in df_no_filtered.columns:
+            try:
+                df_no_display["id"] = df_no_filtered["id"].astype(int)
+            except Exception:
+                df_no_display["id"] = df_no_filtered["id"].astype(str)
+    
+        if df_no_display.empty:
             st.info("No hay clientes para mostrar.")
         else:
-            # Guardamos una copia original en session_state para comparar ediciones
+            # Guardamos copia original (claves como str)
             orig_no_key = "orig_no_map"
-            # Normalizar claves a string para evitar problemas de tipos (int vs numpy.int64)
             orig_no_map = {str(r.get("id")): r for r in df_no_display.to_dict("records")}
             st.session_state[orig_no_key] = orig_no_map
-            
+    
+            # Configurar AgGrid
             gb = GridOptionsBuilder.from_dataframe(df_no_display)
-            # Asegurar que la columna 'id' exista en el grid (oculta) para que siempre venga en los datos devueltos
-            if "id" in df_no_display.columns:
-                gb.configure_column("id", hide=True)
             gb.configure_default_column(filterable=True, editable=False, sortable=True, resizable=True)
-           
+    
+            # Asegurar columna id oculta para que venga en data/resultados
+            if "id" in df_no_display.columns:
+                gb.configure_column("id", hide=True, editable=False)
+    
+            # Configurar selección por checkbox (y marcar checkboxSelection en la primera columna visible)
             gb.configure_selection(selection_mode="multiple", use_checkbox=True)
-
-            # Campos de texto editables
+            visible_cols = [c for c in df_no_display.columns if c != "id"]
+            first_col = visible_cols[0] if visible_cols else "id"
+            try:
+                gb.configure_column(first_col, checkboxSelection=True, headerCheckboxSelection=True)
+            except Exception:
+                # no crítico; use_checkbox suele bastar
+                pass
+    
+            # Campos editables (mantener los que ya tenías)
             gb.configure_column("Nombre", editable=True, cellEditor="agTextCellEditor")
             gb.configure_column("NIT", editable=True, cellEditor="agTextCellEditor")
             gb.configure_column("Persona de Contacto", editable=True, cellEditor="agTextCellEditor")
@@ -463,45 +483,40 @@ if st.session_state.get("authentication_status") is True:
             gb.configure_column("Teléfono", editable=True, cellEditor="agTextCellEditor")
             gb.configure_column("Email", editable=True, cellEditor="agTextCellEditor")
             gb.configure_column("Observación", editable=True, cellEditor="agLargeTextCellEditor")
-            
-            # Campo de fecha con calendario
             gb.configure_column("Última Fecha de Contacto", editable=True, cellEditor="agDateCellEditor")
-            
-            # Campo booleano con checkbox
             gb.configure_column("Contactado", editable=True, cellEditor="agCheckboxCellEditor")
-
+    
             gridOptions = gb.build()
     
             grid_response = AgGrid(
                 df_no_display,
                 gridOptions=gridOptions,
                 enable_enterprise_modules=False,
-                update_mode=GridUpdateMode.MODEL_CHANGED,          # MODELO_CHANGED dispara en cada edición
+                update_mode=GridUpdateMode.MODEL_CHANGED,
                 data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
                 fit_columns_on_grid_load=True,
                 height=420
             )
     
-            # --- Guardado automático de ediciones ---
+            # --- Guardado automático de ediciones (igual que el bloque que ya tenías) ---
             try:
                 edited = pd.DataFrame(grid_response.get("data", []))
                 if not edited.empty:
                     orig_map = st.session_state.get(orig_no_key, {})
                     applied_any_update = False
-                
+    
                     for _, row in edited.iterrows():
                         rid_raw = row.get("id")
                         if rid_raw is None:
                             continue
-                        # Normalizar a string (coherente con orig_map)
                         try:
                             rid_str = str(int(rid_raw))
                         except Exception:
                             rid_str = str(rid_raw)
-                
+    
                         orig_row = orig_map.get(rid_str, {})
                         updates_db = {}
-                
+    
                         for disp_col in edited.columns:
                             if disp_col == "id":
                                 continue
@@ -511,7 +526,8 @@ if st.session_state.get("authentication_status") is True:
                                 db_col = display_to_db.get(disp_col)
                                 if not db_col:
                                     continue
-                                # manejo especial fecha_contacto y contactado (igual que antes)
+    
+                                # Manejo de fecha_contacto
                                 if db_col == "fecha_contacto":
                                     try:
                                         if new_val in (None, "", "None", "null", "NULL"):
@@ -532,7 +548,7 @@ if st.session_state.get("authentication_status") is True:
                                             updates_db[db_col] = None if pd.isna(parsed) else str(parsed.date())
                                     except Exception:
                                         updates_db[db_col] = None
-                
+    
                                 elif db_col == "contactado":
                                     if isinstance(new_val, bool):
                                         updates_db[db_col] = new_val
@@ -540,37 +556,30 @@ if st.session_state.get("authentication_status") is True:
                                         updates_db[db_col] = bool(new_val)
                                 else:
                                     updates_db[db_col] = new_val
-                
+    
                         if updates_db:
                             try:
-                                # pasar cliente_id como int si es posible
                                 try:
                                     cliente_id_param = int(rid_str)
                                 except Exception:
                                     cliente_id_param = rid_str
                                 actualizar_cliente_campos(cliente_id_param, updates_db)
                                 applied_any_update = True
-                                # actualizar el original en session_state con los valores nuevos (usar keys de display)
                                 orig_map.setdefault(rid_str, {})
                                 for k_disp, v in row.items():
                                     orig_map[rid_str][k_disp] = v
                             except Exception as e:
                                 st.error(f"Error guardando cambios para id {rid_str}: {e}")
-                
+    
                     st.session_state[orig_no_key] = orig_map
-                
-                    # Si aplicamos al menos una actualización, forzamos una recarga controlada
                     if applied_any_update:
                         safe_rerun()
-
-
-                    # Para que la UI refleje el cambio inmediatamente (mover registro entre tabs, etc.)
-                    # forzamos una recarga controlada del script. Esto NO borra cookies de autenticación.
-                    safe_rerun()
-
+    
             except Exception as e:
-                # si algo falla no rompemos la app; lo logueamos
                 st.text(f"(Aviso) Error procesando ediciones automáticas: {e}")
+    
+            # resto: exportar, eliminar, etc. (mantén tu lógica de eliminación pero usa safe_rerun() después)
+
     
             # Botón de exportar (usa df_no original sin renombrar para mantener campos DB)
             st.download_button(
@@ -620,24 +629,39 @@ if st.session_state.get("authentication_status") is True:
         if filtro2 and not df_si_filtered.empty and "nombre" in df_si_filtered.columns:
             df_si_filtered = df_si_filtered[df_si_filtered["nombre"].str.contains(filtro2, case=False, na=False)]
     
-        if df_si_filtered is None or df_si_filtered.empty:
+        df_si_display = rename_columns_for_display(df_si_filtered)
+    
+        # Recuperar id si fue removida por el rename
+        if df_si_display is None:
+            df_si_display = pd.DataFrame()
+    
+        if "id" not in df_si_display.columns and "id" in df_si_filtered.columns:
+            try:
+                df_si_display["id"] = df_si_filtered["id"].astype(int)
+            except Exception:
+                df_si_display["id"] = df_si_filtered["id"].astype(str)
+    
+        if df_si_display.empty:
             st.info("No hay clientes contactados para mostrar.")
         else:
-            df_si_display = rename_columns_for_display(df_si_filtered)
-    
-            # Guardamos originales para comparación
             orig_si_key = "orig_si_map"
             orig_si_map = {str(r.get("id")): r for r in df_si_display.to_dict("records")}
             st.session_state[orig_si_key] = orig_si_map
-            
+    
             gb2 = GridOptionsBuilder.from_dataframe(df_si_display)
-            if "id" in df_si_display.columns:
-                gb2.configure_column("id", hide=True)
             gb2.configure_default_column(filterable=True, sortable=True, resizable=True)
-
+    
+            if "id" in df_si_display.columns:
+                gb2.configure_column("id", hide=True, editable=False)
+    
             gb2.configure_selection(selection_mode="multiple", use_checkbox=True)
-
-            # Campos de texto editables
+            visible_cols = [c for c in df_si_display.columns if c != "id"]
+            first_col = visible_cols[0] if visible_cols else "id"
+            try:
+                gb2.configure_column(first_col, checkboxSelection=True, headerCheckboxSelection=True)
+            except Exception:
+                pass
+    
             gb2.configure_column("Nombre", editable=True, cellEditor="agTextCellEditor")
             gb2.configure_column("NIT", editable=True, cellEditor="agTextCellEditor")
             gb2.configure_column("Persona de Contacto", editable=True, cellEditor="agTextCellEditor")
@@ -646,13 +670,9 @@ if st.session_state.get("authentication_status") is True:
             gb2.configure_column("Teléfono", editable=True, cellEditor="agTextCellEditor")
             gb2.configure_column("Email", editable=True, cellEditor="agTextCellEditor")
             gb2.configure_column("Observación", editable=True, cellEditor="agLargeTextCellEditor")
-            
-            # Campo de fecha con calendario
             gb2.configure_column("Última Fecha de Contacto", editable=True, cellEditor="agDateCellEditor")
-            
-            # Campo booleano con checkbox
             gb2.configure_column("Contactado", editable=True, cellEditor="agCheckboxCellEditor")
-
+    
             gridOptions2 = gb2.build()
     
             grid_response2 = AgGrid(
@@ -665,26 +685,25 @@ if st.session_state.get("authentication_status") is True:
                 height=420
             )
     
-            # --- Guardado automático de ediciones (igual que en tab1) ---
+            # --- Guardado automático de ediciones ---
             try:
                 edited2 = pd.DataFrame(grid_response2.get("data", []))
                 if not edited2.empty:
                     orig_map2 = st.session_state.get(orig_si_key, {})
                     applied_any_update = False
-                
+    
                     for _, row in edited2.iterrows():
                         rid_raw = row.get("id")
                         if rid_raw is None:
                             continue
-                        # Normalizar id a string para ser coherente con orig_map2
                         try:
                             rid_str = str(int(rid_raw))
                         except Exception:
                             rid_str = str(rid_raw)
-                
+    
                         orig_row = orig_map2.get(rid_str, {})
                         updates_db = {}
-                
+    
                         for disp_col in edited2.columns:
                             if disp_col == "id":
                                 continue
@@ -694,8 +713,7 @@ if st.session_state.get("authentication_status") is True:
                                 db_col = display_to_db.get(disp_col)
                                 if not db_col:
                                     continue
-                
-                                # Manejo especial de fecha_contacto
+    
                                 if db_col == "fecha_contacto":
                                     try:
                                         if new_val in (None, "", "None", "null", "NULL"):
@@ -716,45 +734,38 @@ if st.session_state.get("authentication_status") is True:
                                             updates_db[db_col] = None if pd.isna(parsed) else str(parsed.date())
                                     except Exception:
                                         updates_db[db_col] = None
-                
-                                # Manejo booleano contactado
+    
                                 elif db_col == "contactado":
                                     if isinstance(new_val, bool):
                                         updates_db[db_col] = new_val
                                     else:
                                         updates_db[db_col] = bool(new_val)
-                
-                                # Otros campos: asignar tal cual
                                 else:
                                     updates_db[db_col] = new_val
-                
+    
                         if updates_db:
                             try:
-                                # intentar pasar id como int cuando sea posible
                                 try:
                                     cliente_id_param = int(rid_str)
                                 except Exception:
                                     cliente_id_param = rid_str
-                
                                 actualizar_cliente_campos(cliente_id_param, updates_db)
                                 applied_any_update = True
-                
-                                # actualizar el original en session_state para evitar re-aplicar el mismo cambio
                                 orig_map2.setdefault(rid_str, {})
                                 for k_disp, v in row.items():
                                     orig_map2[rid_str][k_disp] = v
-                
                             except Exception as e:
                                 st.error(f"Error guardando cambios para id {rid_str}: {e}")
-                
+    
                     st.session_state[orig_si_key] = orig_map2
-                
-                    # Si aplicamos cambios, forzamos una recarga controlada
                     if applied_any_update:
                         safe_rerun()
-
+    
             except Exception as e:
                 st.text(f"(Aviso) Error procesando ediciones automáticas en Contactados: {e}")
+    
+            # Exportar Contactados, eliminar, etc.
+
     
             # Exportar Contactados
             st.download_button(
