@@ -292,7 +292,8 @@ if st.session_state.get("authentication_status") is True:
             "modalidad": "Modalidad",
             "origen": "Origen",
             "destino": "Destino",
-            "mercancia": "Mercancía"
+            "mercancia": "Mercancía",
+            "id": "id"
         }
         df2 = df.copy()
         df2 = df2.rename(columns={k: v for k, v in rename_map.items() if k in df2.columns})
