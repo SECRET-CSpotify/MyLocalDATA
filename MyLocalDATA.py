@@ -368,35 +368,61 @@ if st.session_state.get("authentication_status") is True:
     # --------------------------
     # Listado y exportación de clientes (AgGrid con guardado automático)
     # --------------------------
-    # Definimos df_no y df_si ANTES de los tabs
-    df_no = pd.DataFrame()
-    df_si = pd.DataFrame()
+    # --------------------------
+    # Cargar df_no / df_si (con caché en session_state y soporte de "force refresh")
+    # --------------------------
+    # Intentar usar versiones en caché si existen (para respuesta inmediata)
+    df_no = st.session_state.get('df_no_cached')
+    df_si = st.session_state.get('df_si_cached')
     
-    selected_base = st.session_state.get("selected_base_view", "TRANSLOGISTIC")
+    # Flag que puede forzar recarga desde la BD (safe_rerun() podía setear esto)
+    force_refresh = False
+    if st.session_state.get("_force_refresh"):
+        force_refresh = True
+        # consumimos la marca para evitar recargas repetidas
+        try:
+            st.session_state.pop("_force_refresh", None)
+        except Exception:
+            pass
     
-    if is_admin:
-        if filtrar_base and filtrar_base != "Todas":
-            df_no = obtener_clientes(contactado=False, username=None, is_admin=True, base_name=filtrar_base)
-            df_si = obtener_clientes(contactado=True, username=None, is_admin=True, base_name=filtrar_base)
-        elif filtrar_username:
-            df_no = obtener_clientes(contactado=False, username=filtrar_username, is_admin=True)
-            df_si = obtener_clientes(contactado=True, username=filtrar_username, is_admin=True)
-        else:
-            df_no = obtener_clientes(contactado=False, is_admin=True)
-            df_si = obtener_clientes(contactado=True, is_admin=True)
-    else:
-        if selected_base == "TRANSLOGISTIC":
-            df_no = obtener_clientes(contactado=False, username=None, is_admin=False, base_name="TRANSLOGISTIC")
-            df_si = obtener_clientes(contactado=True, username=None, is_admin=False, base_name="TRANSLOGISTIC")
-        else:
-            internal_base = f"{username}__{selected_base}"
-            df_no = obtener_clientes(contactado=False, username=username, is_admin=False, base_name=internal_base)
-            df_si = obtener_clientes(contactado=True, username=username, is_admin=False, base_name=internal_base)
+    # Si no hay caché o se pide recarga forzada, leer desde la BD y actualizar caché
+    if df_no is None or df_si is None or force_refresh:
+        selected_base = st.session_state.get("selected_base_view", "TRANSLOGISTIC")
+    
+        try:
+            if is_admin:
+                if 'filtrar_base' in locals() and filtrar_base and filtrar_base != "Todas":
+                    df_no = obtener_clientes(contactado=False, username=None, is_admin=True, base_name=filtrar_base)
+                    df_si = obtener_clientes(contactado=True, username=None, is_admin=True, base_name=filtrar_base)
+                elif 'filtrar_username' in locals() and filtrar_username:
+                    df_no = obtener_clientes(contactado=False, username=filtrar_username, is_admin=True)
+                    df_si = obtener_clientes(contactado=True, username=filtrar_username, is_admin=True)
+                else:
+                    df_no = obtener_clientes(contactado=False, is_admin=True)
+                    df_si = obtener_clientes(contactado=True, is_admin=True)
+            else:
+                if selected_base == "TRANSLOGISTIC":
+                    df_no = obtener_clientes(contactado=False, username=None, is_admin=False, base_name="TRANSLOGISTIC")
+                    df_si = obtener_clientes(contactado=True, username=None, is_admin=False, base_name="TRANSLOGISTIC")
+                else:
+                    internal_base = f"{username}__{selected_base}"
+                    df_no = obtener_clientes(contactado=False, username=username, is_admin=False, base_name=internal_base)
+                    df_si = obtener_clientes(contactado=True, username=username, is_admin=False, base_name=internal_base)
+    
+            # Guardar en session_state para reuso por este run y futuros runs
+            st.session_state['df_no_cached'] = df_no
+            st.session_state['df_si_cached'] = df_si
+        except Exception as e:
+            st.error(f"Error al leer clientes desde la BD: {e}")
+            df_no = pd.DataFrame()
+            df_si = pd.DataFrame()
     
     # Import AgGrid — preferible tenerlo al top, pero lo dejamos aquí si no está importado antes
     from st_aggrid import AgGrid, GridOptionsBuilder, DataReturnMode, GridUpdateMode
     
+    # Crear tabs
     tab1, tab2 = st.tabs(["📋 No Contactados", "✅ Contactados"])
+
     
     # --------------------------------------------------------------------
     # Helper: mapping display columns <-> DB columns (debe coincidir con rename_columns_for_display)
@@ -571,9 +597,45 @@ if st.session_state.get("authentication_status") is True:
                             except Exception as e:
                                 st.error(f"Error guardando cambios para id {rid_str}: {e}")
     
+                    # persistimos el mapa actualizado
                     st.session_state[orig_no_key] = orig_map
+                    
+                    # --------- REFRESCAR INMEDIATAMENTE LOS DF desde la BD ----------
+                    try:
+                        # Volver a obtener los datos desde la DB usando la misma lógica que usas arriba
+                        if is_admin:
+                            if filtrar_base and filtrar_base != "Todas":
+                                df_no = obtener_clientes(contactado=False, username=None, is_admin=True, base_name=filtrar_base)
+                                df_si = obtener_clientes(contactado=True, username=None, is_admin=True, base_name=filtrar_base)
+                            elif filtrar_username:
+                                df_no = obtener_clientes(contactado=False, username=filtrar_username, is_admin=True)
+                                df_si = obtener_clientes(contactado=True, username=filtrar_username, is_admin=True)
+                            else:
+                                df_no = obtener_clientes(contactado=False, is_admin=True)
+                                df_si = obtener_clientes(contactado=True, is_admin=True)
+                        else:
+                            selected_base = st.session_state.get("selected_base_view", "TRANSLOGISTIC")
+                            if selected_base == "TRANSLOGISTIC":
+                                df_no = obtener_clientes(contactado=False, username=None, is_admin=False, base_name="TRANSLOGISTIC")
+                                df_si = obtener_clientes(contactado=True, username=None, is_admin=False, base_name="TRANSLOGISTIC")
+                            else:
+                                internal_base = f"{username}__{selected_base}"
+                                df_no = obtener_clientes(contactado=False, username=username, is_admin=False, base_name=internal_base)
+                                df_si = obtener_clientes(contactado=True, username=username, is_admin=False, base_name=internal_base)
+                    
+                        # Guardar en session_state para que el siguiente render use estas versiones
+                        st.session_state['df_no_cached'] = df_no
+                        st.session_state['df_si_cached'] = df_si
+                    
+                        # Mensaje opcional para debug (puedes quitarlo luego)
+                        st.info(f"✅ Datos recargados: No contactados={len(df_no) if df_no is not None else 0}, Contactados={len(df_si) if df_si is not None else 0}")
+                    except Exception as e:
+                        st.error(f"Error refrescando datos desde BD: {e}")
+                    
+                    # Forzar rerun controlado para que la UI vuelva a render con los DF recargados
                     if applied_any_update:
                         safe_rerun()
+
     
             except Exception as e:
                 st.text(f"(Aviso) Error procesando ediciones automáticas: {e}")
@@ -611,7 +673,37 @@ if st.session_state.get("authentication_status") is True:
                                     st.error(f"No se pudo eliminar id {rid}: {e}")
                             if deleted_any:
                                 st.success("Clientes seleccionados eliminados ✅")
+                                # Releer la BD inmediatamente y guardar en session_state
+                                try:
+                                    # Reusar la misma lógica para recomponer df_no y df_si
+                                    if is_admin:
+                                        if filtrar_base and filtrar_base != "Todas":
+                                            df_no = obtener_clientes(contactado=False, username=None, is_admin=True, base_name=filtrar_base)
+                                            df_si = obtener_clientes(contactado=True, username=None, is_admin=True, base_name=filtrar_base)
+                                        elif filtrar_username:
+                                            df_no = obtener_clientes(contactado=False, username=filtrar_username, is_admin=True)
+                                            df_si = obtener_clientes(contactado=True, username=filtrar_username, is_admin=True)
+                                        else:
+                                            df_no = obtener_clientes(contactado=False, is_admin=True)
+                                            df_si = obtener_clientes(contactado=True, is_admin=True)
+                                    else:
+                                        selected_base = st.session_state.get("selected_base_view", "TRANSLOGISTIC")
+                                        if selected_base == "TRANSLOGISTIC":
+                                            df_no = obtener_clientes(contactado=False, username=None, is_admin=False, base_name="TRANSLOGISTIC")
+                                            df_si = obtener_clientes(contactado=True, username=None, is_admin=False, base_name="TRANSLOGISTIC")
+                                        else:
+                                            internal_base = f"{username}__{selected_base}"
+                                            df_no = obtener_clientes(contactado=False, username=username, is_admin=False, base_name=internal_base)
+                                            df_si = obtener_clientes(contactado=True, username=username, is_admin=False, base_name=internal_base)
+                            
+                                    st.session_state['df_no_cached'] = df_no
+                                    st.session_state['df_si_cached'] = df_si
+                                except Exception as e:
+                                    st.error(f"Error refrescando datos tras eliminación: {e}")
+                            
+                                # Forzar rerun controlado para que la UI se actualice
                                 safe_rerun()
+
                             else:
                                 st.info("No se eliminaron registros.")
                         except Exception as e:
@@ -757,9 +849,41 @@ if st.session_state.get("authentication_status") is True:
                             except Exception as e:
                                 st.error(f"Error guardando cambios para id {rid_str}: {e}")
     
+                    # persistimos el mapa actualizado
                     st.session_state[orig_si_key] = orig_map2
+                    
+                    # --------- REFRESCAR INMEDIATAMENTE LOS DF desde la BD (TAB 2) ----------
+                    try:
+                        if is_admin:
+                            if filtrar_base and filtrar_base != "Todas":
+                                df_no = obtener_clientes(contactado=False, username=None, is_admin=True, base_name=filtrar_base)
+                                df_si = obtener_clientes(contactado=True, username=None, is_admin=True, base_name=filtrar_base)
+                            elif filtrar_username:
+                                df_no = obtener_clientes(contactado=False, username=filtrar_username, is_admin=True)
+                                df_si = obtener_clientes(contactado=True, username=filtrar_username, is_admin=True)
+                            else:
+                                df_no = obtener_clientes(contactado=False, is_admin=True)
+                                df_si = obtener_clientes(contactado=True, is_admin=True)
+                        else:
+                            selected_base = st.session_state.get("selected_base_view", "TRANSLOGISTIC")
+                            if selected_base == "TRANSLOGISTIC":
+                                df_no = obtener_clientes(contactado=False, username=None, is_admin=False, base_name="TRANSLOGISTIC")
+                                df_si = obtener_clientes(contactado=True, username=None, is_admin=False, base_name="TRANSLOGISTIC")
+                            else:
+                                internal_base = f"{username}__{selected_base}"
+                                df_no = obtener_clientes(contactado=False, username=username, is_admin=False, base_name=internal_base)
+                                df_si = obtener_clientes(contactado=True, username=username, is_admin=False, base_name=internal_base)
+                    
+                        st.session_state['df_no_cached'] = df_no
+                        st.session_state['df_si_cached'] = df_si
+                    
+                        st.info(f"✅ Datos recargados: No contactados={len(df_no) if df_no is not None else 0}, Contactados={len(df_si) if df_si is not None else 0}")
+                    except Exception as e:
+                        st.error(f"Error refrescando datos desde BD: {e}")
+                    
                     if applied_any_update:
                         safe_rerun()
+
     
             except Exception as e:
                 st.text(f"(Aviso) Error procesando ediciones automáticas en Contactados: {e}")
