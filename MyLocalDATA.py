@@ -276,6 +276,7 @@ if st.session_state.get("authentication_status") is True:
         if df.empty:
             return df
         rename_map = {
+            "id": "id"
             "nombre": "Nombre",
             "nit": "NIT",
             "contacto": "Persona de Contacto",
@@ -441,10 +442,14 @@ if st.session_state.get("authentication_status") is True:
         else:
             # Guardamos una copia original en session_state para comparar ediciones
             orig_no_key = "orig_no_map"
-            orig_no_map = {r["id"]: r for r in df_no_display.to_dict("records")}
+            # Normalizar claves a string para evitar problemas de tipos (int vs numpy.int64)
+            orig_no_map = {str(r.get("id")): r for r in df_no_display.to_dict("records")}
             st.session_state[orig_no_key] = orig_no_map
-    
+            
             gb = GridOptionsBuilder.from_dataframe(df_no_display)
+            # Asegurar que la columna 'id' exista en el grid (oculta) para que siempre venga en los datos devueltos
+            if "id" in df_no_display.columns:
+                gb.configure_column("id", hide=True)
             gb.configure_default_column(filterable=True, editable=False, sortable=True, resizable=True)
            
             gb.configure_selection(selection_mode="multiple", use_checkbox=True)
@@ -481,81 +486,84 @@ if st.session_state.get("authentication_status") is True:
             try:
                 edited = pd.DataFrame(grid_response.get("data", []))
                 if not edited.empty:
-                    # comparar con originales en st.session_state
                     orig_map = st.session_state.get(orig_no_key, {})
+                    applied_any_update = False
+                
                     for _, row in edited.iterrows():
-                        rid = row.get("id")
-                        if not rid:
+                        rid_raw = row.get("id")
+                        if rid_raw is None:
                             continue
-                        orig_row = orig_map.get(rid, {})
+                        # Normalizar a string (coherente con orig_map)
+                        try:
+                            rid_str = str(int(rid_raw))
+                        except Exception:
+                            rid_str = str(rid_raw)
+                
+                        orig_row = orig_map.get(rid_str, {})
                         updates_db = {}
-                        # Revisar cada columna visible si cambió
+                
                         for disp_col in edited.columns:
-                            # ignorar la columna 'id'
                             if disp_col == "id":
                                 continue
                             old_val = orig_row.get(disp_col)
                             new_val = row.get(disp_col)
-                            # si hay cambio
                             if (pd.isna(old_val) and (new_val is not None and new_val != "")) or (not pd.isna(old_val) and old_val != new_val):
                                 db_col = display_to_db.get(disp_col)
                                 if not db_col:
                                     continue
-                                # manejo especial de fecha_contacto y contactado
+                                # manejo especial fecha_contacto y contactado (igual que antes)
                                 if db_col == "fecha_contacto":
-                                    # Normalizar a None o 'YYYY-MM-DD' — evitar valores como "{}"
                                     try:
-                                        # casos claramente "vacíos"
                                         if new_val in (None, "", "None", "null", "NULL"):
                                             updates_db[db_col] = None
-                                        # cadena literal con llaves "{}" que a veces retorna el editor
                                         elif isinstance(new_val, str) and new_val.strip() in ("{}", "{ }"):
                                             updates_db[db_col] = None
-                                        # si viene un dict (p.ej. {'date': '2025-08-31'}) intentamos extraer
                                         elif isinstance(new_val, dict):
                                             date_candidate = new_val.get("date") or new_val.get("value") or next(iter(new_val.values()), None)
                                             parsed = pd.to_datetime(date_candidate, errors="coerce")
-                                            if pd.isna(parsed):
-                                                updates_db[db_col] = None
-                                            else:
-                                                updates_db[db_col] = str(parsed.date())
-                                        # pandas Timestamp u objetos con .date()
+                                            updates_db[db_col] = None if pd.isna(parsed) else str(parsed.date())
                                         elif hasattr(new_val, "date"):
                                             try:
                                                 updates_db[db_col] = str(new_val.date())
                                             except Exception:
                                                 updates_db[db_col] = None
                                         else:
-                                            # intentar parsear cualquier string/valor con pandas
                                             parsed = pd.to_datetime(new_val, errors="coerce")
-                                            if pd.isna(parsed):
-                                                updates_db[db_col] = None
-                                            else:
-                                                updates_db[db_col] = str(parsed.date())
+                                            updates_db[db_col] = None if pd.isna(parsed) else str(parsed.date())
                                     except Exception:
-                                        # en caso de error defensivo no enviamos valor inválido a la DB
                                         updates_db[db_col] = None
-
+                
                                 elif db_col == "contactado":
-                                    # normalizar booleano
                                     if isinstance(new_val, bool):
                                         updates_db[db_col] = new_val
                                     else:
-                                        # intentar convertir a booleano desde string/número
                                         updates_db[db_col] = bool(new_val)
                                 else:
                                     updates_db[db_col] = new_val
+                
                         if updates_db:
                             try:
-                                actualizar_cliente_campos(rid, updates_db)
-                                # actualizar el original en session_state para no re-aplicar el mismo cambio
+                                # pasar cliente_id como int si es posible
+                                try:
+                                    cliente_id_param = int(rid_str)
+                                except Exception:
+                                    cliente_id_param = rid_str
+                                actualizar_cliente_campos(cliente_id_param, updates_db)
+                                applied_any_update = True
+                                # actualizar el original en session_state con los valores nuevos (usar keys de display)
+                                orig_map.setdefault(rid_str, {})
                                 for k_disp, v in row.items():
-                                    orig_map[rid][k_disp] = v
+                                    orig_map[rid_str][k_disp] = v
                             except Exception as e:
-                                st.error(f"Error guardando cambios para id {rid}: {e}")
-                    # persistimos el mapa actualizado
+                                st.error(f"Error guardando cambios para id {rid_str}: {e}")
+                
                     st.session_state[orig_no_key] = orig_map
-                    
+                
+                    # Si aplicamos al menos una actualización, forzamos una recarga controlada
+                    if applied_any_update:
+                        safe_rerun()
+
+
                     # Para que la UI refleje el cambio inmediatamente (mover registro entre tabs, etc.)
                     # forzamos una recarga controlada del script. Esto NO borra cookies de autenticación.
                     safe_rerun()
@@ -580,14 +588,23 @@ if st.session_state.get("authentication_status") is True:
                     st.warning("Confirmar: se eliminarán los clientes seleccionados.")
                     if st.button("Confirmar eliminación seleccionados (No Contactados)", key="confirm_eliminar_no"):
                         try:
+                            deleted_any = False
                             for row in selected_no:
-                                # Si por alguna razón row viene como pandas.Series o similar, convertir a dict seguro
                                 if hasattr(row, "to_dict"):
                                     row = row.to_dict()
                                 rid = row.get("id")
-                                if rid:
-                                    eliminar_cliente(rid)
-                            st.success("Clientes seleccionados eliminados ✅")
+                                if not rid:
+                                    continue
+                                try:
+                                    eliminar_cliente(int(rid))
+                                    deleted_any = True
+                                except Exception as e:
+                                    st.error(f"No se pudo eliminar id {rid}: {e}")
+                            if deleted_any:
+                                st.success("Clientes seleccionados eliminados ✅")
+                                safe_rerun()
+                            else:
+                                st.info("No se eliminaron registros.")
                         except Exception as e:
                             st.error(f"No se pudieron eliminar: {e}")
 
@@ -610,10 +627,12 @@ if st.session_state.get("authentication_status") is True:
     
             # Guardamos originales para comparación
             orig_si_key = "orig_si_map"
-            orig_si_map = {r["id"]: r for r in df_si_display.to_dict("records")}
+            orig_si_map = {str(r.get("id")): r for r in df_si_display.to_dict("records")}
             st.session_state[orig_si_key] = orig_si_map
-    
+            
             gb2 = GridOptionsBuilder.from_dataframe(df_si_display)
+            if "id" in df_si_display.columns:
+                gb2.configure_column("id", hide=True)
             gb2.configure_default_column(filterable=True, sortable=True, resizable=True)
 
             gb2.configure_selection(selection_mode="multiple", use_checkbox=True)
@@ -651,12 +670,21 @@ if st.session_state.get("authentication_status") is True:
                 edited2 = pd.DataFrame(grid_response2.get("data", []))
                 if not edited2.empty:
                     orig_map2 = st.session_state.get(orig_si_key, {})
+                    applied_any_update = False
+                
                     for _, row in edited2.iterrows():
-                        rid = row.get("id")
-                        if not rid:
+                        rid_raw = row.get("id")
+                        if rid_raw is None:
                             continue
-                        orig_row = orig_map2.get(rid, {})
+                        # Normalizar id a string para ser coherente con orig_map2
+                        try:
+                            rid_str = str(int(rid_raw))
+                        except Exception:
+                            rid_str = str(rid_raw)
+                
+                        orig_row = orig_map2.get(rid_str, {})
                         updates_db = {}
+                
                         for disp_col in edited2.columns:
                             if disp_col == "id":
                                 continue
@@ -666,59 +694,64 @@ if st.session_state.get("authentication_status") is True:
                                 db_col = display_to_db.get(disp_col)
                                 if not db_col:
                                     continue
+                
+                                # Manejo especial de fecha_contacto
                                 if db_col == "fecha_contacto":
-                                    # Normalizar a None o 'YYYY-MM-DD' — evitar valores como "{}"
                                     try:
-                                        # casos claramente "vacíos"
                                         if new_val in (None, "", "None", "null", "NULL"):
                                             updates_db[db_col] = None
-                                        # cadena literal con llaves "{}" que a veces retorna el editor
                                         elif isinstance(new_val, str) and new_val.strip() in ("{}", "{ }"):
                                             updates_db[db_col] = None
-                                        # si viene un dict (p.ej. {'date': '2025-08-31'}) intentamos extraer
                                         elif isinstance(new_val, dict):
                                             date_candidate = new_val.get("date") or new_val.get("value") or next(iter(new_val.values()), None)
                                             parsed = pd.to_datetime(date_candidate, errors="coerce")
-                                            if pd.isna(parsed):
-                                                updates_db[db_col] = None
-                                            else:
-                                                updates_db[db_col] = str(parsed.date())
-                                        # pandas Timestamp u objetos con .date()
+                                            updates_db[db_col] = None if pd.isna(parsed) else str(parsed.date())
                                         elif hasattr(new_val, "date"):
                                             try:
                                                 updates_db[db_col] = str(new_val.date())
                                             except Exception:
                                                 updates_db[db_col] = None
                                         else:
-                                            # intentar parsear cualquier string/valor con pandas
                                             parsed = pd.to_datetime(new_val, errors="coerce")
-                                            if pd.isna(parsed):
-                                                updates_db[db_col] = None
-                                            else:
-                                                updates_db[db_col] = str(parsed.date())
+                                            updates_db[db_col] = None if pd.isna(parsed) else str(parsed.date())
                                     except Exception:
-                                        # en caso de error defensivo no enviamos valor inválido a la DB
                                         updates_db[db_col] = None
-
+                
+                                # Manejo booleano contactado
                                 elif db_col == "contactado":
                                     if isinstance(new_val, bool):
                                         updates_db[db_col] = new_val
                                     else:
                                         updates_db[db_col] = bool(new_val)
+                
+                                # Otros campos: asignar tal cual
                                 else:
                                     updates_db[db_col] = new_val
+                
                         if updates_db:
                             try:
-                                actualizar_cliente_campos(rid, updates_db)
-                                # actualizar original en session_state
+                                # intentar pasar id como int cuando sea posible
+                                try:
+                                    cliente_id_param = int(rid_str)
+                                except Exception:
+                                    cliente_id_param = rid_str
+                
+                                actualizar_cliente_campos(cliente_id_param, updates_db)
+                                applied_any_update = True
+                
+                                # actualizar el original en session_state para evitar re-aplicar el mismo cambio
+                                orig_map2.setdefault(rid_str, {})
                                 for k_disp, v in row.items():
-                                    orig_map2[rid][k_disp] = v
+                                    orig_map2[rid_str][k_disp] = v
+                
                             except Exception as e:
-                                st.error(f"Error guardando cambios para id {rid}: {e}")
+                                st.error(f"Error guardando cambios para id {rid_str}: {e}")
+                
                     st.session_state[orig_si_key] = orig_map2
-                    # Para que la UI refleje el cambio inmediatamente (mover registro entre tabs, etc.)
-                    # forzamos una recarga controlada del script. Esto NO borra cookies de autenticación.
-                    safe_rerun()
+                
+                    # Si aplicamos cambios, forzamos una recarga controlada
+                    if applied_any_update:
+                        safe_rerun()
 
             except Exception as e:
                 st.text(f"(Aviso) Error procesando ediciones automáticas en Contactados: {e}")
@@ -739,13 +772,24 @@ if st.session_state.get("authentication_status") is True:
                     st.warning("Confirmar: se eliminarán los clientes seleccionados.")
                     if st.button("Confirmar eliminación seleccionados (Contactados)", key="confirm_eliminar_si"):
                         try:
+                            deleted_any = False
                             for row in selected:
                                 if hasattr(row, "to_dict"):
                                     row = row.to_dict()
                                 rid = row.get("id")
-                                if rid:
-                                    eliminar_cliente(rid)
-                            st.success("Clientes seleccionados eliminados ✅")
+                                if not rid:
+                                    continue
+                                try:
+                                    eliminar_cliente(int(rid))
+                                    deleted_any = True
+                                except Exception as e:
+                                    st.error(f"No se pudo eliminar id {rid}: {e}")
+                            if deleted_any:
+                                st.success("Clientes seleccionados eliminados ✅")
+                                # Forzar refresh para que la vista se actualice inmediatamente
+                                safe_rerun()
+                            else:
+                                st.info("No se eliminaron registros.")
                         except Exception as e:
                             st.error(f"No se pudieron eliminar: {e}")
 
@@ -816,12 +860,14 @@ if st.session_state.get("authentication_status") is True:
             cancelar = st.button("Cancelar eliminación")
             if confirma:
                 try:
-                    eliminar_cliente(cliente["id"])
+                    eliminar_cliente(int(cliente["id"]))
                     st.success("Cliente eliminado ✅")
-                    # limpiar la intención para evitar repeticiones
                     st.session_state.pop("confirm_delete_cliente", None)
+                    # Forzar refresh para que la lista y los tabs se actualicen
+                    safe_rerun()
                 except Exception as e:
                     st.error(f"No se pudo eliminar el cliente: {e}")
+
             if cancelar:
                 st.session_state.pop("confirm_delete_cliente", None)
                 st.info("Eliminación cancelada.")
