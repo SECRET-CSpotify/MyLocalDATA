@@ -159,9 +159,16 @@ if st.session_state.get("authentication_status") is True:
     # --------------------------
     page_bg = """
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
-
-    :root { --main-font: 'Poppins', sans-serif; }
+    /* Cargar Faculty Glyphic hospedada en tu servidor (ej: https://tudominio.com/fonts/FacultyGlyphic.woff2) */
+    @font-face {
+        font-family: 'Faculty Glyphic';
+        src: url('https://fonts.gstatic.com/s/facultyglyphic/v4/RrQIbot2-iBvI2mYSyKIrcgoBuQ4Eu2EBVk.woff2') format('woff2');
+        font-weight: 300 800;
+        font-style: normal;
+        font-display: swap;
+    }
+    
+    :root { --main-font: 'Faculty Glyphic', 'Poppins', sans-serif; }
 
     html, body, [class*="css"], .stMarkdown, .stText, .stDataFrame, table {
         font-family: var(--main-font) !important;
@@ -512,6 +519,11 @@ if st.session_state.get("authentication_status") is True:
                                 st.error(f"Error guardando cambios para id {rid}: {e}")
                     # persistimos el mapa actualizado
                     st.session_state[orig_no_key] = orig_map
+                    
+                    # Para que la UI refleje el cambio inmediatamente (mover registro entre tabs, etc.)
+                    # forzamos una recarga controlada del script. Esto NO borra cookies de autenticación.
+                    st.experimental_rerun()
+
             except Exception as e:
                 # si algo falla no rompemos la app; lo logueamos
                 st.text(f"(Aviso) Error procesando ediciones automáticas: {e}")
@@ -668,6 +680,10 @@ if st.session_state.get("authentication_status") is True:
                             except Exception as e:
                                 st.error(f"Error guardando cambios para id {rid}: {e}")
                     st.session_state[orig_si_key] = orig_map2
+                    # Para que la UI refleje el cambio inmediatamente (mover registro entre tabs, etc.)
+                    # forzamos una recarga controlada del script. Esto NO borra cookies de autenticación.
+                    st.experimental_rerun()
+
             except Exception as e:
                 st.text(f"(Aviso) Error procesando ediciones automáticas en Contactados: {e}")
     
@@ -820,6 +836,17 @@ if st.session_state.get("authentication_status") is True:
         st.info("No hay visitas agendadas.")
     else:
         st.dataframe(visitas_df, use_container_width=True)
+
+st.markdown("---")
+st.markdown("<div style='text-align:center; padding: 12px;'>"
+            "<h3 style='margin-bottom:6px;color:white;'>Sigue al Creador - SECRET C</h3>"
+            f"<a href='https://open.spotify.com/artist/2BrdB1i0wFfQFppxPvYFTy' target='_blank' title='Spotify'>"
+            "<img src='https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/spotify.svg' style='height:34px;margin:0 10px;vertical-align:middle;'/>"
+            "</a>"
+            f"<a href='https://www.instagram.com/imsecretc/' target='_blank' title='Instagram'>"
+            "<img src='https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/instagram.svg' style='height:34px;margin:0 10px;vertical-align:middle;'/>"
+            "</a>"
+            "</div>", unsafe_allow_html=True)
 
 
 elif st.session_state.get("authentication_status") is False:
