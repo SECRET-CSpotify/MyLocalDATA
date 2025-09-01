@@ -837,17 +837,16 @@ if st.session_state.get("authentication_status") is True:
     else:
         st.dataframe(visitas_df, use_container_width=True)
 
-st.markdown("---")
-st.markdown("<div style='text-align:center; padding: 12px;'>"
-            "<h3 style='margin-bottom:6px;color:white;'>Sigue al Creador - SECRET C</h3>"
-            f"<a href='https://open.spotify.com/artist/2BrdB1i0wFfQFppxPvYFTy' target='_blank' title='Spotify'>"
-            "<img src='https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/spotify.svg' style='height:34px;margin:0 10px;vertical-align:middle;'/>"
-            "</a>"
-            f"<a href='https://www.instagram.com/imsecretc/' target='_blank' title='Instagram'>"
-            "<img src='https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/instagram.svg' style='height:34px;margin:0 10px;vertical-align:middle;'/>"
-            "</a>"
-            "</div>", unsafe_allow_html=True)
-
+    st.markdown("---")
+    st.markdown("<div style='text-align:center; padding: 12px;'>"
+                "<h3 style='margin-bottom:6px;color:white;'>Sigue al Creador - SECRET C</h3>"
+                f"<a href='https://open.spotify.com/artist/2BrdB1i0wFfQFppxPvYFTy' target='_blank' title='Spotify'>"
+                "<img src='https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/spotify.svg' style='height:34px;margin:0 10px;vertical-align:middle;'/>"
+                "</a>"
+                f"<a href='https://www.instagram.com/imsecretc/' target='_blank' title='Instagram'>"
+                "<img src='https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/instagram.svg' style='height:34px;margin:0 10px;vertical-align:middle;'/>"
+                "</a>"
+                "</div>", unsafe_allow_html=True)
 
 elif st.session_state.get("authentication_status") is False:
     st.sidebar.error("❌ Usuario o contraseña incorrectos")
